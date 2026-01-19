@@ -12,6 +12,10 @@
 using namespace std;
 using namespace Eigen;
 
+// ---------- utility free inline ----------
+inline int idlocal(int i, int j, int nx) { return i + j * nx; }
+
+
 // ---------- Partition helper (stile: class con metodo statico) ----------
 class Partition {
     public:
@@ -58,6 +62,49 @@ class LocalProblem {
     }
 
      bool is_lu_ok() const { return lu_ok; }
+
+     // apply RAS: r_core (size core_n) -> z_core (size core_n)
+    void apply_RAS(const vector<double> &r_core, vector<double> &z_core) const {
+        z_core.assign(core_n, 0.0);
+        if (ex_n == 0 || !lu_ok) return;
+
+        VectorXd r_loc(ex_n);
+        r_loc.setZero();
+
+        for (int j = 0; j < ex_ny; ++j) {
+            for (int i = 0; i < ex_nx; ++i) {
+                int gi = ex_i0 + i;
+                int gj = ex_j0 + j;
+                int loc = idlocal(i, j, ex_nx);
+                if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) {
+                    r_loc[loc] = 0.0;
+                    continue;
+                }
+                if (gi >= ci_s && gi <= ci_e && gj >= cj_s && gj <= cj_e) {
+                    int ii = gi - ci_s;
+                    int jj = gj - cj_s;
+                    int cid = idlocal(ii, jj, core_nx);
+                    r_loc[loc] = r_core[cid];
+                } else {
+                    r_loc[loc] = 0.0;
+                }
+            }
+        }
+
+        VectorXd xloc = eig_lu.solve(r_loc);
+
+        for (int j = 0; j < core_ny; ++j)
+            for (int i = 0; i < core_nx; ++i) {
+                int gi = ci_s + i;
+                int gj = cj_s + j;
+                if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) continue;
+                int ei = gi - ex_i0;
+                int ej = gj - ex_j0;
+                int loc = idlocal(ei, ej, ex_nx);
+                int cid = idlocal(i, j, core_nx);
+                z_core[cid] = xloc[loc];
+            }
+    }
 
 
 
