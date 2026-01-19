@@ -163,7 +163,6 @@ class LocalProblem {
 
         eig_lu.compute(A_loc);
     }
-
 };
 
 
@@ -211,6 +210,32 @@ class SchwarzSolver {
     }
 
 
+     void run(int max_it, double tol, int m_restart) {
+        // rhs_pre = M^{-1} rhs
+        vector<double> rhs_pre(core_n, 0.0);
+        apply_RAS(b_local, rhs_pre);
+
+        double rhs_norm = sqrt(dot_local(rhs_pre, rhs_pre));
+        if (rhs_norm == 0.0) rhs_norm = 1.0;
+
+        // inizial residual r = rhs_pre - M^{-1} A x
+        vector<double> x(core_n, 0.0);
+        vector<double> Ax(core_n, 0.0), MInvAx(core_n, 0.0);
+        matvec(x, Ax);
+        apply_RAS(Ax, MInvAx);
+
+        vector<double> r(core_n, 0.0);
+        for (int i = 0; i < core_n; ++i) r[i] = rhs_pre[i] - MInvAx[i];
+
+
+        //GMRES METHOD ...
+        
+
+        // gather and save same as original
+        gather_solution(x);
+    }
+
+
     private:
 
      MPI_Comm cart;
@@ -230,6 +255,16 @@ class SchwarzSolver {
     vector<double> send_bottom, recv_bottom, send_top, recv_top;
 
     vector<double> b_local;
+
+
+    double dot_local(const vector<double> &a, const vector<double> &b) const {
+        double s = 0.0;
+        int n = (int)a.size();
+        for (int i = 0; i < n; ++i) s += a[i] * b[i];
+        double sglob = 0.0;
+        MPI_Allreduce(&s, &sglob, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        return sglob;
+    }
 
 
 
