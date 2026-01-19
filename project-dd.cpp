@@ -266,6 +266,78 @@ class SchwarzSolver {
         return sglob;
     }
 
+    void matvec(const vector<double> &p, vector<double> &Ap) {
+        double idx2 = 1.0/(hx*hx);
+        double idy2 = 1.0/(hy*hy);
+        double diag_center = mu * (2.0*idx2 + 2.0*idy2) + c;
+        double diag_off_x = -mu * idx2;
+        double diag_off_y = -mu * idy2;
+
+        for (int j = 0; j < core_ny; ++j)
+            for (int i = 0; i < core_nx; ++i)
+                x_halo[idlocal(i+1, j+1, halo_nx)] = p[idlocal(i,j,core_nx)];
+
+        for (int j = 0; j < core_ny; ++j) {
+            send_left[j]  = p[idlocal(0, j, core_nx)];
+            send_right[j] = p[idlocal(core_nx-1, j, core_nx)];
+        }
+        for (int i = 0; i < core_nx; ++i) {
+            send_bottom[i] = p[idlocal(i, 0, core_nx)];
+            send_top[i]    = p[idlocal(i, core_ny-1, core_nx)];
+        }
+
+        MPI_Status st;
+
+        MPI_Sendrecv(send_right.data(), core_ny, MPI_DOUBLE, right, 0,
+                     recv_left.data(),  core_ny, MPI_DOUBLE, left,  0,
+                     cart, &st);
+
+        MPI_Sendrecv(send_left.data(), core_ny, MPI_DOUBLE, left,  1,
+                     recv_right.data(), core_ny, MPI_DOUBLE, right, 1,
+                     cart, &st);
+
+        MPI_Sendrecv(send_top.data(), core_nx, MPI_DOUBLE, up, 2,
+                     recv_bottom.data(), core_nx, MPI_DOUBLE, down, 2,
+                     cart, &st);
+
+        MPI_Sendrecv(send_bottom.data(), core_nx, MPI_DOUBLE, down, 3,
+                     recv_top.data(), core_nx, MPI_DOUBLE, up, 3,
+                     cart, &st);
+
+        for (int j = 0; j < core_ny; ++j) {
+            x_halo[idlocal(0, j+1, halo_nx)]         = recv_left[j];
+            x_halo[idlocal(halo_nx-1, j+1, halo_nx)] = recv_right[j];
+        }
+        for (int i = 0; i < core_nx; ++i) {
+            x_halo[idlocal(i+1, 0, halo_nx)]           = recv_bottom[i];
+            x_halo[idlocal(i+1, halo_ny-1, halo_nx)]   = recv_top[i];
+        }
+
+        for (int j = 0; j < core_ny; ++j) {
+            for (int i = 0; i < core_nx; ++i) {
+                int gi = ci_s + i;
+                int gj = cj_s + j;
+                int lid = idlocal(i, j, core_nx);
+                if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) {
+                    Ap[lid] = p[lid];
+                    continue;
+                }
+                double uc = x_halo[idlocal(i+1, j+1, halo_nx)];
+                double ul = x_halo[idlocal(i,   j+1, halo_nx)];
+                double ur = x_halo[idlocal(i+2, j+1, halo_nx)];
+                double ud = x_halo[idlocal(i+1, j,   halo_nx)];
+                double uu = x_halo[idlocal(i+1, j+2, halo_nx)];
+                Ap[lid] = diag_center * uc + diag_off_x * (ul + ur) + diag_off_y * (ud + uu);
+            }
+        }
+    }
+
+    void apply_RAS(const vector<double> &r, vector<double> &z) const {
+        // delegate to local problem (same semantics)
+        local->apply_RAS(r, z);
+    }
+
+
 
 
 };
