@@ -45,7 +45,7 @@ class LocalProblem {
               double _mu, double _c)
     {
 
-         ex_i0 = _ex_i0; ex_i1 = _ex_i1; ex_j0 = _ex_j0; ex_j1 = _ex_j1;
+        ex_i0 = _ex_i0; ex_i1 = _ex_i1; ex_j0 = _ex_j0; ex_j1 = _ex_j1;
         ex_nx = (ex_i1 >= ex_i0) ? (ex_i1 - ex_i0 + 1) : 0;
         ex_ny = (ex_j1 >= ex_j0) ? (ex_j1 - ex_j0 + 1) : 0;
         ex_n = ex_nx * ex_ny;
@@ -64,7 +64,7 @@ class LocalProblem {
      bool is_lu_ok() const { return lu_ok; }
 
      // apply RAS: r_core (size core_n) -> z_core (size core_n)
-    void apply_RAS(const vector<double> &r_core, vector<double> &z_core) const {
+     void apply_RAS(const vector<double> &r_core, vector<double> &z_core) const {
         z_core.assign(core_n, 0.0);
         if (ex_n == 0 || !lu_ok) return;
 
@@ -106,9 +106,6 @@ class LocalProblem {
             }
     }
 
-
-
-
      // getters used later for gathering
     int ext_start() const { return ex_i0; } // WARNING: these are 2D extents in original; keep semantics used by gather
     int ext_end()   const { return ex_i1; }
@@ -120,23 +117,52 @@ class LocalProblem {
     int core_start_y() const { return cj_s; }
 
     private:
-     // geometry
-    int ex_i0, ex_i1, ex_j0, ex_j1;
-    int ex_nx, ex_ny, ex_n;
-    int ci_s, ci_e, cj_s, cj_e;
-    int core_nx, core_ny, core_n;
-    int Nx, Ny;
+        // geometry
+        int ex_i0, ex_i1, ex_j0, ex_j1;
+        int ex_nx, ex_ny, ex_n;
+        int ci_s, ci_e, cj_s, cj_e;
+        int core_nx, core_ny, core_n;
+        int Nx, Ny;
 
-     // PDE / grid
-    double hx, hy, mu, c;
+        // PDE / grid
+        double hx, hy, mu, c;
 
-    // eigen LU
-    MatrixXd A_loc;
-    PartialPivLU<MatrixXd> eig_lu;
-    bool lu_ok;
+        // eigen LU
+        MatrixXd A_loc;
+        PartialPivLU<MatrixXd> eig_lu;
+        bool lu_ok;
 
 
+        void assemble_and_factorize() {
+        lu_ok = true;
+        if (ex_n <= 0) { lu_ok = false; return; }
 
+        A_loc = MatrixXd::Zero(ex_n, ex_n);
+        double idx2 = 1.0/(hx*hx);
+        double idy2 = 1.0/(hy*hy);
+        double diag_center = mu * (2.0*idx2 + 2.0*idy2) + c;
+        double diag_off_x = -mu * idx2;
+        double diag_off_y = -mu * idy2;
+
+        for (int j = 0; j < ex_ny; ++j) {
+            for (int i = 0; i < ex_nx; ++i) {
+                int row = idlocal(i,j,ex_nx);
+                int gi = ex_i0 + i;
+                int gj = ex_j0 + j;
+                if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) {
+                    A_loc(row,row) = 1.0;
+                    continue;
+                }
+                A_loc(row,row) = diag_center;
+                if (gi - 1 >= ex_i0) A_loc(row, idlocal(i-1,j,ex_nx)) = diag_off_x;
+                if (gi + 1 <= ex_i1) A_loc(row, idlocal(i+1,j,ex_nx)) = diag_off_x;
+                if (gj - 1 >= ex_j0) A_loc(row, idlocal(i,j-1,ex_nx)) = diag_off_y;
+                if (gj + 1 <= ex_j1) A_loc(row, idlocal(i,j+1,ex_nx)) = diag_off_y;
+            }
+        }
+
+        eig_lu.compute(A_loc);
+    }
 
 };
 
