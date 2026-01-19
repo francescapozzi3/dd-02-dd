@@ -77,11 +77,32 @@ class SchwarzSolver {
 
 
 int main(int argc, char** argv) {
+ MPI_Init(&argc, &argv);
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // default parameters
+    int Nx = 51, Ny = 51;
+    int Px = 0, Py = 0;
+    int overlap = 2;
+    double mu = 0.01, c = 5.0;
+    int max_it = 1000;
+    double tol = 1e-6;
+
+    if (argc >= 3) { Nx = stoi(argv[1]); Ny = stoi(argv[2]); }
+    if (argc >= 5) { Px = stoi(argv[3]); Py = stoi(argv[4]); }
+    if (argc >= 6) overlap = stoi(argv[5]);
+    if (argc >= 7) mu = stod(argv[6]);
+    if (argc >= 8) c = stod(argv[7]);
+    if (argc >= 9) max_it = stoi(argv[8]);
+    if (argc >= 10) tol = stod(argv[9]);
 
 
 
 
 
+    MPI_Finalize();
 
     return 0;
 }
