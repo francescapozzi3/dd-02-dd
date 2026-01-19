@@ -12,6 +12,7 @@
 using namespace std;
 using namespace Eigen;
 
+// ---------- Partition helper (stile: class con metodo statico) ----------
 class Partition {
     public:
     static void compute_1d_partition(int N, int nb, int pid, int &start, int &len) {
@@ -23,6 +24,9 @@ class Partition {
 
 };
 
+// ---------- LocalProblem (2D) -----
+// Incapsula la costruzione della matrice locale estesa, la fattorizzazione con Eigen
+// e l'applicazione del precondizionatore RAS (solve locale + restrizione).
 
 class LocalProblem {
     public:
@@ -48,6 +52,9 @@ class LocalProblem {
 };
 
 
+// ---------- SchwarzSolver (2D) -----
+// Incapsula lo scambio halo, il matvec, l'applicazione del precondizionatore locale e
+// l'algoritmo GMRES restartable. Ha interfaccia simile all'esempio 1D (run()).
 class SchwarzSolver {
     public:
     SchwarzSolver(MPI_Comm cart_comm, int rank, int size,
