@@ -110,8 +110,27 @@ class SchwarzSolver {
           hx(hx), hy(hy), mu(mu), c(c), left(left), right(right), down(down), up(up),
           local(localProb)
     {
+         core_n = core_nx * core_ny;
+        halo_nx = core_nx + 2; halo_ny = core_ny + 2;
+        x_halo.assign(halo_nx * halo_ny, 0.0);
+        send_left.assign(core_ny, 0.0); recv_left.assign(core_ny, 0.0);
+        send_right.assign(core_ny, 0.0); recv_right.assign(core_ny, 0.0);
+        send_bottom.assign(core_nx, 0.0); recv_bottom.assign(core_nx, 0.0);
+        send_top.assign(core_nx, 0.0); recv_top.assign(core_nx, 0.0);
 
-
+        // initialize RHS exactly as original
+        b_local.assign(core_n, 0.0);
+        for (int j = 0; j < core_ny; ++j) {
+            for (int i = 0; i < core_nx; ++i) {
+                int gi = ci_s + i;
+                int gj = cj_s + j;
+                int lid = idlocal(i, j, core_nx);
+                if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1)
+                    b_local[lid] = 0.0;
+                else
+                    b_local[lid] = 1.0;
+            }
+        }
 
     }
 
@@ -120,6 +139,25 @@ class SchwarzSolver {
 
 
     private:
+
+     MPI_Comm cart;
+    int rank, size;
+    int Nx, Ny;
+    int ci_s, cj_s;
+    int core_nx, core_ny, core_n;
+    double hx, hy, mu, c;
+    int left, right, down, up;
+
+    LocalProblem *local; // non-owning pointer: ownership in main
+
+    // halos and buffers
+    int halo_nx, halo_ny;
+    vector<double> x_halo;
+    vector<double> send_left, recv_left, send_right, recv_right;
+    vector<double> send_bottom, recv_bottom, send_top, recv_top;
+
+    vector<double> b_local;
+
 
 
 };
