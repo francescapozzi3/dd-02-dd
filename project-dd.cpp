@@ -337,7 +337,47 @@ class SchwarzSolver {
         local->apply_RAS(r, z);
     }
 
-
+     // gather solution (identical semantic to original: rank0 collects core pieces and writes solution.csv)
+    void gather_solution(const vector<double> &x_local) {
+        if (rank == 0) {
+            vector<double> U(Nx * Ny, 0.0);
+            for (int j = 0; j < core_ny; ++j)
+                for (int i = 0; i < core_nx; ++i) {
+                    int gi = ci_s + i;
+                    int gj = cj_s + j;
+                    U[idlocal(gi, gj, Nx)] = x_local[idlocal(i,j,core_nx)];
+                }
+            for (int p = 1; p < size; ++p) {
+                MPI_Status st;
+                int meta[4];
+                MPI_Recv(meta, 4, MPI_INT, p, 300, MPI_COMM_WORLD, &st);
+                int rs = meta[0], cs = meta[1], rn = meta[2], cn = meta[3];
+                vector<double> buf(rn*cn);
+                MPI_Recv(buf.data(), rn*cn, MPI_DOUBLE, p, 301, MPI_COMM_WORLD, &st);
+                for (int jj=0; jj<cn; ++jj)
+                    for (int ii=0; ii<rn; ++ii) {
+                        int gi = rs + ii;
+                        int gj = cs + jj;
+                        U[idlocal(gi, gj, Nx)] = buf[idlocal(ii,jj,rn)];
+                    }
+            }
+            ofstream ofs("solution.csv");
+            ofs << "x,y,u\n";
+            for (int j=0;j<Ny;++j) {
+                for (int i=0;i<Nx;++i) {
+                    double xg = i * (1.0/(Nx - 1));
+                    double yg = j * (1.0/(Ny - 1));
+                    ofs << xg << "," << yg << "," << U[idlocal(i,j,Nx)] << "\n";
+                }
+            }
+            ofs.close();
+            cout << "solution.csv written by rank 0";
+        } else {
+            int meta[4] = { ci_s, cj_s, core_nx, core_ny };
+            MPI_Send(meta, 4, MPI_INT, 0, 300, MPI_COMM_WORLD);
+            MPI_Send(x_local.data(), core_n, MPI_DOUBLE, 0, 301, MPI_COMM_WORLD);
+        }
+    }
 
 
 };
