@@ -41,10 +41,52 @@ class LocalProblem {
               double _mu, double _c)
     {
 
+         ex_i0 = _ex_i0; ex_i1 = _ex_i1; ex_j0 = _ex_j0; ex_j1 = _ex_j1;
+        ex_nx = (ex_i1 >= ex_i0) ? (ex_i1 - ex_i0 + 1) : 0;
+        ex_ny = (ex_j1 >= ex_j0) ? (ex_j1 - ex_j0 + 1) : 0;
+        ex_n = ex_nx * ex_ny;
+
+        ci_s = _ci_s; ci_e = _ci_e; cj_s = _cj_s; cj_e = _cj_e;
+        core_nx = (ci_e >= ci_s) ? (ci_e - ci_s + 1) : 0;
+        core_ny = (cj_e >= cj_s) ? (cj_e - cj_s + 1) : 0;
+        core_n = core_nx * core_ny;
+
+        Nx = _Nx; Ny = _Ny; hx = _hx; hy = _hy; mu = _mu; c = _c;
+
+        assemble_and_factorize();
 
     }
 
+     bool is_lu_ok() const { return lu_ok; }
+
+
+
+
+     // getters used later for gathering
+    int ext_start() const { return ex_i0; } // WARNING: these are 2D extents in original; keep semantics used by gather
+    int ext_end()   const { return ex_i1; }
+    int ext_nx()    const { return ex_nx; }
+    int ext_ny()    const { return ex_ny; }
+    int core_nx_get() const { return core_nx; }
+    int core_ny_get() const { return core_ny; }
+    int core_start_x() const { return ci_s; }
+    int core_start_y() const { return cj_s; }
+
     private:
+     // geometry
+    int ex_i0, ex_i1, ex_j0, ex_j1;
+    int ex_nx, ex_ny, ex_n;
+    int ci_s, ci_e, cj_s, cj_e;
+    int core_nx, core_ny, core_n;
+    int Nx, Ny;
+
+     // PDE / grid
+    double hx, hy, mu, c;
+
+    // eigen LU
+    MatrixXd A_loc;
+    PartialPivLU<MatrixXd> eig_lu;
+    bool lu_ok;
 
 
 
