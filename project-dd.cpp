@@ -43,12 +43,35 @@ class LocalProblem {
     private:
 
 
-    
+
 
 };
 
 
 class SchwarzSolver {
+    public:
+    SchwarzSolver(MPI_Comm cart_comm, int rank, int size,
+                  int Nx, int Ny,
+                  int ci_s, int core_nx, int cj_s, int core_ny,
+                  double hx, double hy, double mu, double c,
+                  int left, int right, int down, int up,
+                  LocalProblem *localProb)
+        : cart(cart_comm), rank(rank), size(size), Nx(Nx), Ny(Ny),
+          ci_s(ci_s), cj_s(cj_s), core_nx(core_nx), core_ny(core_ny),
+          hx(hx), hy(hy), mu(mu), c(c), left(left), right(right), down(down), up(up),
+          local(localProb)
+    {
+
+
+
+    }
+
+     ~SchwarzSolver() {
+    }
+
+
+    private:
+
 
 };
 
