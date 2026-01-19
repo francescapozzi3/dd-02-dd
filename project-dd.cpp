@@ -406,10 +406,61 @@ int main(int argc, char** argv) {
     if (argc >= 10) tol = stod(argv[9]);
 
 
+    int dims[2] = {Px, Py};
+    if (dims[0] == 0 || dims[1] == 0) {
+        dims[0] = dims[1] = 0;
+        MPI_Dims_create(size, 2, dims);
+    }
+    Px = dims[0]; Py = dims[1];
+    int periods[2] = {0,0};
+    MPI_Comm cart;
+    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cart);
 
+    int coords[2];
+    MPI_Cart_coords(cart, rank, 2, coords);
+    int px = coords[0], py = coords[1];
 
+    int ci_s, cnx, cj_s, cny;
+    Partition::compute_1d_partition(Nx, Px, px, ci_s, cnx);
+    Partition::compute_1d_partition(Ny, Py, py, cj_s, cny);
+    int ci_e = ci_s + cnx - 1;
+    int cj_e = cj_s + cny - 1;
+
+    int left, right, down, up;
+    MPI_Cart_shift(cart, 0, 1, &left, &right);
+    MPI_Cart_shift(cart, 1, 1, &down, &up);
+
+    double hx = 1.0 / (Nx - 1);
+    double hy = 1.0 / (Ny - 1);
+
+    // extended domain for RAS
+    int ex_i0 = max(0, ci_s - overlap);
+    int ex_i1 = min(Nx-1, ci_e + overlap);
+    int ex_j0 = max(0, cj_s - overlap);
+    int ex_j1 = min(Ny-1, cj_e + overlap);
+
+    // create LocalProblem (si occupa di assemblare e fattorizzare la matrice locale)
+    LocalProblem *local = new LocalProblem();
+    local->init(ex_i0, ex_i1, ex_j0, ex_j1,
+                ci_s, ci_e, cj_s, cj_e,
+                Nx, Ny, hx, hy, mu, c);
+
+    // create SchwarzSolver object (incapsula matvec, precond e GMRES)
+    SchwarzSolver solver(cart, rank, size,
+                         Nx, Ny,
+                         ci_s, cnx, cj_s, cny,
+                         hx, hy, mu, c,
+                         left, right, down, up,
+                         local);
+
+    int m = min(30, max_it);
+    // run the solver (metodo run simile all'esempio 1D)
+    solver.run(max_it, tol, m);
+
+    delete local;
 
     MPI_Finalize();
+    
 
     return 0;
 }
