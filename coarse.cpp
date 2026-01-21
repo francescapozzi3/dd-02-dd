@@ -39,6 +39,97 @@ class Partition {
 };     // splits the N grid points into nb processes
 
 
+// ---------- CoarseSolver ----------
+// handles the second level of the Schwarz method: 
+// global coarse grid that allows information to propagate across the entire domain in one step
+class CoarseSolver {
+    int Ncx, Ncy;  // coarse grid dimensions
+    int Nx, Ny;    // fine grid dimensions
+    SparseMatrix<double> Ac;   // sparse matrix
+    SparseLU<SparseMatrix<double>> lu_coarse;
+    int rank;
+
+public:
+    CoarseSolver(int _Nx, int _Ny, int _Ncx, int _Ncy, double mu, double c, int _rank) 
+        : Nx(_Nx), Ny(_Ny), Ncx(_Ncx), Ncy(_Ncy), rank(_rank) {
+        
+        // every rank stores and solves the coarse system 
+        int n_coarse = Ncx * Ncy;
+        Ac.resize(n_coarse, n_coarse);
+        vector<Triplet<double>> triplets;  // global matrix representing the same PDE but on the coarse grid
+        
+        double hcx = 1.0 / (Ncx - 1);
+        double hcy = 1.0 / (Ncy - 1);
+        double idx2 = 1.0 / (hcx*hcx);
+        double idy2 = 1.0 / (hcy*hcy);
+
+        // assemble coarse system matrix (identical on all processes)
+        for (int j = 0; j < Ncy; ++j) {
+            for (int i = 0; i < Ncx; ++i) {
+                int row = idlocal(i, j, Ncx);  // 2D index to a 1D row index
+                if (i == 0 || i == Ncx-1 || j == 0 || j == Ncy-1) {
+                    triplets.push_back(Triplet<double>(row, row, 1.0));
+                    // Dirichlet boundary condition (fix the value at the boundary)
+                    continue;
+                }
+                triplets.push_back(Triplet<double>(row, row, mu * (2*idx2 + 2*idy2) + c));
+                triplets.push_back(Triplet<double>(row, idlocal(i-1, j, Ncx), -mu * idx2));
+                triplets.push_back(Triplet<double>(row, idlocal(i+1, j, Ncx), -mu * idx2));
+                triplets.push_back(Triplet<double>(row, idlocal(i, j-1, Ncx), -mu * idy2));
+                triplets.push_back(Triplet<double>(row, idlocal(i, j+1, Ncx), -mu * idy2));
+                // build the 5-point finite difference stencil (consider interior nodes)
+            }
+        }
+        Ac.setFromTriplets(triplets.begin(), triplets.end());  // convert the triplet list into a sparse matrix Ac
+        lu_coarse.compute(Ac);   // factorize the matrix with a sparse LU solver
+    }
+
+    // solve the coarse problem: restriction -> solve -> prolongation
+    void solve(const vector<double>& r_glob, vector<double>& e_local, int ci_s, int cj_s, int core_nx, int core_ny) {
+        int n_coarse = Ncx * Ncy;
+        VectorXd rc = VectorXd::Zero(n_coarse);
+        
+        // restriction: (fine grid points sampled for coarse grid)
+        // take the global fine residual and samples it at the coarse grid locations
+        double rx = (double)(Nx - 1) / (Ncx - 1);
+        double ry = (double)(Ny - 1) / (Ncy - 1);
+
+        for (int jc = 0; jc < Ncy; ++jc) {
+            for (int ic = 0; ic < Ncx; ++ic) {
+                rc[idlocal(ic, jc, Ncx)] = r_glob[idlocal(round(ic*rx), round(jc*ry), Nx)];
+            }
+        }
+
+        VectorXd ec = lu_coarse.solve(rc);   // solve the global system on the coarse grid
+
+        // prolongation: (back to fine grid)
+        // every process calculates only its local piece of the global error correction
+        e_local.assign(core_nx * core_ny, 0.0);
+        for (int j = 0; j < core_ny; ++j) {
+            for (int i = 0; i < core_nx; ++i) {
+                int gi = ci_s + i;    // global coarse grid coordinates corresponding to the local (i,j) point
+                int gj = cj_s + j;
+
+                double xc = gi / rx;  // map the local coordinates to coarse-grid 'real' coordinates
+                double yc = gj / ry;
+                int i0 = (int)xc; 
+                int i1 = min(i0 + 1, Ncx - 1);
+                int j0 = (int)yc; 
+                int j1 = min(j0 + 1, Ncy - 1);
+                double dx = xc - i0; 
+                double dy = yc - j0;
+                
+                e_local[idlocal(i, j, core_nx)] =                // bilinear interpolation
+                    (1-dx)*(1-dy)*ec[idlocal(i0, j0, Ncx)] +
+                    dx*(1-dy)*ec[idlocal(i1, j0, Ncx)] +
+                    (1-dx)*dy*ec[idlocal(i0, j1, Ncx)] +
+                    dx*dy*ec[idlocal(i1, j1, Ncx)];
+            }
+        }
+    }
+};
+
+
 // ---------- LocalProblem (2D) -----
 // Incapsula la costruzione della matrice locale estesa, la fattorizzazione con Eigen
 // e l'applicazione del precondizionatore RAS (solve locale + restrizione).
