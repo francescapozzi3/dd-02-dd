@@ -288,11 +288,11 @@ class SchwarzSolver {
                   int ci_s, int core_nx, int cj_s, int core_ny,
                   double hx, double hy, double mu, double c,
                   int left, int right, int down, int up,
-                  LocalProblem *localProb)
+                  LocalProblem *localProb, CoarseSolver *coarseProb)
         : cart(cart_comm), rank(rank), size(size), Nx(Nx), Ny(Ny),
           ci_s(ci_s), cj_s(cj_s), core_nx(core_nx), core_ny(core_ny),
           hx(hx), hy(hy), mu(mu), c(c), left(left), right(right), down(down), up(up),
-          local(localProb)
+          local(localProb), coarse(coarseProb)
     {
         core_n = core_nx * core_ny;
         halo_nx = core_nx + 2; halo_ny = core_ny + 2;
@@ -567,6 +567,7 @@ int main(int argc, char** argv) {
     double mu = 0.01, c = 5.0;
     int max_it = 1000;
     double tol = 1e-6;
+    int Ncx = 9, Ncy = 9; // coarse grid size
 
     if (argc >= 3) { Nx = stoi(argv[1]); Ny = stoi(argv[2]); }
     if (argc >= 5) { Px = stoi(argv[3]); Py = stoi(argv[4]); }
@@ -585,14 +586,14 @@ int main(int argc, char** argv) {
     Px = dims[0]; Py = dims[1];
     int periods[2] = {0,0};
     MPI_Comm cart;
-    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cart);
+    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cart);  // create a 2D cartesian topology
 
     int coords[2];
     MPI_Cart_coords(cart, rank, 2, coords);
     int px = coords[0], py = coords[1];
 
     int ci_s, cnx, cj_s, cny;
-    Partition::compute_1d_partition(Nx, Px, px, ci_s, cnx);
+    Partition::compute_1d_partition(Nx, Px, px, ci_s, cnx);   // calculates the local 'core' indices
     Partition::compute_1d_partition(Ny, Py, py, cj_s, cny);
     int ci_e = ci_s + cnx - 1;
     int cj_e = cj_s + cny - 1;
@@ -605,7 +606,7 @@ int main(int argc, char** argv) {
     double hy = 1.0 / (Ny - 1);
 
     // extended domain for RAS
-    int ex_i0 = max(0, ci_s - overlap);
+    int ex_i0 = max(0, ci_s - overlap);     // extending the indices by adding the overlap
     int ex_i1 = min(Nx-1, ci_e + overlap);
     int ex_j0 = max(0, cj_s - overlap);
     int ex_j1 = min(Ny-1, cj_e + overlap);
@@ -616,22 +617,25 @@ int main(int argc, char** argv) {
                 ci_s, ci_e, cj_s, cj_e,
                 Nx, Ny, hx, hy, mu, c);
 
+    // CoarseSolver object
+    CoarseSolver *coarse = new CoarseSolver(Nx, Ny, Ncx, Ncy, mu, c, rank);
+
     // create SchwarzSolver object (incapsula matvec, precond e GMRES)
     SchwarzSolver solver(cart, rank, size,
                          Nx, Ny,
                          ci_s, cnx, cj_s, cny,
                          hx, hy, mu, c,
                          left, right, down, up,
-                         local);
+                         local, coarse);
 
     int m = min(30, max_it);
     // run the solver (metodo run simile all'esempio 1D)
     solver.run(max_it, tol, m);
 
     delete local;
+    delete coarse;
 
     MPI_Finalize();
-    
 
     return 0;
 }
