@@ -449,7 +449,7 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local) {
             }
 
         // Rank 0 writes solution.csv
-        ofstream ofs("solution.csv");
+        std::ofstream ofs("solution.csv");
         ofs << "x,y,u\n";
         for (int j = 0; j < Ny; ++j) {
             for (int i = 0; i < Nx; ++i) {
