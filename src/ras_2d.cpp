@@ -383,6 +383,21 @@ Solver::Solver(MPI_Comm cart_comm, int rank_, int size_,
     }
 }
 
+void Solver::apply_TwoLevel(const vector<double> &r_local, vector<double> &z_local)
+{
+    // 1. Level 1: RAS Fine Correction  (fine level)
+    local->apply_RAS(r_local, z_local);
+
+    // 2. Level 2: Coarse Grid Correction
+    vector<double> e_local_coarse(core_n, 0.0);
+    coarse->solve(r_local, e_local_coarse, ci_s, cj_s, core_nx, core_ny, cart);
+
+    // Add coarse correction to RAS result 
+    for (int i = 0; i < core_n; ++i) {
+            z_local[i] += e_local_coarse[i];
+    }
+}
+
 
 double Solver::dot_global(const Eigen::VectorXd& a,
                           const Eigen::VectorXd& b) const
