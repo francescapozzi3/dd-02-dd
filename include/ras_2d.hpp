@@ -176,7 +176,7 @@ private:
   void gather_and_save(const Eigen::VectorXd& x_local);
 
   // Two-Level preconditioner
-  void apply_TwoLevel(const Eigen::VectorXd& r_local, const Eigen::VectorXd& z_local);
+  void apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_local);
 
 private:
   MPI_Comm cart;
