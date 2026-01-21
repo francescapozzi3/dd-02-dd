@@ -38,15 +38,15 @@ public:
 class CoarseSolver {
     int Ncx, Ncy; // Coarse grid dimensions
     int Nx, Ny;   // Fine grid dimensions
-    SparseMatrix<double> Ac;
-    SparseLU<SparseMatrix<double>> lu_coarse;
+    Eigen::SparseMatrix<double> Ac;
+    Eigen::SparseLU<Eigen::SparseMatrix<double>> lu_coarse;
     int rank;
 
   public:
     CoarseSolver(int _Nx, int _Ny, int _Ncx, int _Ncy, double mu, double c, int _rank);
 
-    void solve(const vector<double>& r_local, vector<double>& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use);
-}
+    void solve(const Eigen::VectorXd& r_local, const Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use);
+};
 
 
 // Assemble and solve local problems on extended subdomains
@@ -173,7 +173,7 @@ private:
   void gather_and_save(const Eigen::VectorXd& x_local);
 
   // Two-Level preconditioner
-  void apply_TwoLevel(const vector<double> &r_local, vector<double> &z_local);
+  void apply_TwoLevel(const Eigen::VectorXd& r_local, const Eigen::VectorXd& z_local);
 
 private:
   MPI_Comm cart;
