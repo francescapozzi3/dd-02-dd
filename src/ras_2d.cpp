@@ -70,7 +70,7 @@ void LocalProblem::apply_RAS(const Eigen::VectorXd& r_core,
     z_core.setZero();
 
     // If LU factorization failed or empty problem, return
-    if (ex_n == 0 || !lu_ok) return;
+    if (ext_n == 0 || !lu_ok) return;
 
     // r_loc is defined on extended domain but contains r_core only (0 elsewhere)
     Eigen::VectorXd r_loc = Eigen::VectorXd::Zero(ext_n);
@@ -99,7 +99,7 @@ void LocalProblem::apply_RAS(const Eigen::VectorXd& r_core,
     Eigen::VectorXd z_loc = lu.solve(r_loc);
 
     // Restriction RAS: take only values on core
-    for (int j = 0; j < core_ny; ++j)
+    for (int j = 0; j < core_ny; ++j) {
         for (int i = 0; i < core_nx; ++i) {
             int gi = core_i0 + i;  // Global x index (core)
             int gj = core_j0 + j;  // Global y index (core)
@@ -449,7 +449,7 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local) {
             }
 
         // Rank 0 writes solution.csv
-        ofstream ofs("solution.csv");
+        ofstream::ofs("solution.csv");
         ofs << "x,y,u\n";
         for (int j = 0; j < Ny; ++j) {
             for (int i = 0; i < Nx; ++i) {
