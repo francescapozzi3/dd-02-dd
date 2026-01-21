@@ -62,7 +62,7 @@ hy = y_unique[1] - y_unique[0] if Ny>1 else 1.0
 U_file = df['u'].values.reshape((Ny, Nx))
 
 # build reference sparse system - same discretization and BCs
-mu = 0.01; c = 5.0  # adjust if you used different values in the MPI run
+mu = 1.0; c = 0.1  # adjust if you used different values in the MPI run
 N = Nx * Ny
 rows = []; cols = []; vals = []; b = np.zeros(N)
 for j in range(Ny):
