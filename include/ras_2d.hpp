@@ -169,10 +169,6 @@ private:
   void matvec(const Eigen::VectorXd& p,
               Eigen::VectorXd& Ap);
 
-  // Apply the preconditioner (delegated to LocalProblem).
-  void apply_RAS(const Eigen::VectorXd& r,
-                Eigen::VectorXd& z) const;
-
   // Gather final solution: rank 0 receives (info + buffer) and writes solution.csv.
   void gather_and_save(const Eigen::VectorXd& x_local);
 
