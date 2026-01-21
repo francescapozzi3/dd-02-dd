@@ -383,6 +383,7 @@ Solver::Solver(MPI_Comm cart_comm, int rank_, int size_,
     }
 }
 
+
 void Solver::apply_TwoLevel(const vector<double> &r_local, vector<double> &z_local)
 {
     // 1. Level 1: RAS Fine Correction  (fine level)
@@ -408,14 +409,6 @@ double Solver::dot_global(const Eigen::VectorXd& a,
     double global_dot = 0.0;
     MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, cart);
     return global_dot;
-}
-
-
-void Solver::apply_RAS(const Eigen::VectorXd& r,
-                       Eigen::VectorXd& z) const
-{
-    // Delegate to LocalProblem
-    local->apply_RAS(r, z);
 }
 
 
