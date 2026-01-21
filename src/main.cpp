@@ -16,7 +16,10 @@ int main(int argc, char** argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   // Global grid
-  int Nx = 100, Ny = 100;  
+  int Nx = 100, Ny = 100;
+
+  // Coarse grid
+  int Ncx = 9, Ncy = 9;
 
   // Physical domain [0, 1] x [0, 1]
   double Lx = 1.0;
@@ -99,6 +102,9 @@ int main(int argc, char** argv) {
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
+  // Create CoarseSolver object
+  CoarseSolver *coarse = new CoarseSolver(Nx, Ny, Ncx, Ncy, mu, c, rank);
+
   // Create solver
   Solver solver(cart, cart_rank, size,
                 Nx, Ny,
@@ -106,12 +112,13 @@ int main(int argc, char** argv) {
                 core_j0, core_ny,
                 hx, hy, mu, c,
                 left, right, down, up,
-                local);
+                local, coarse);
 
   // Execution
   solver.run(max_it, tol, restart);
 
   delete local;
+  delete coarse;
 
   MPI_Finalize();
   return 0;
