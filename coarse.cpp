@@ -392,6 +392,38 @@ class SchwarzSolver {
         }
     }
 
+    // give to every process the full global vector (needed for global coarse restriction)
+    void allgather_global_vector(const vector<double> &loc, vector<double> &glob) {
+        vector<int> recvcounts(size);
+        vector<int> displs(size);
+        
+        int my_n = core_n;    // number of element each process has
+        MPI_Allgather(&my_n, 1, MPI_INT, recvcounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+        
+        displs[0] = 0;
+        for (int i = 1; i < size; ++i) 
+            displs[i] = displs[i-1] + recvcounts[i-1];
+        
+        vector<double> flat_glob(Nx * Ny, 0.0);
+        MPI_Allgatherv(loc.data(), core_n, MPI_DOUBLE, flat_glob.data(), recvcounts.data(), displs.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+        
+        // Allgatherv gives us a list of core-blocks. We must map them back to (i,j) coordinates
+        // We need to know the ci_s, cj_s, cnx, cny of every process (share the coordinates)
+        struct ProcInfo { int cs, rs, cn, rn; };
+        vector<ProcInfo> all_info(size);
+        ProcInfo my_info = {ci_s, cj_s, core_nx, core_ny};
+        MPI_Allgather(&my_info, 4, MPI_INT, all_info.data(), 4, MPI_INT, MPI_COMM_WORLD);
+
+        for (int p = 0; p < size; ++p) {
+            int offset = displs[p];
+            for (int jj = 0; jj < all_info[p].rn; ++jj) {
+                for (int ii = 0; ii < all_info[p].cn; ++ii) {
+                    glob[idlocal(all_info[p].cs + ii, all_info[p].rs + jj, Nx)] = flat_glob[offset + idlocal(ii, jj, all_info[p].cn)];
+                }
+            }
+        }
+    }
+
 
     double dot_local(const vector<double> &a, const vector<double> &b) const {
         double s = 0.0;
