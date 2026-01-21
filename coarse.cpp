@@ -171,6 +171,7 @@ class LocalProblem {
 
      // bool is_lu_ok() const { return lu_ok; }
 
+     // take the global residual and map it to the local extended subdomain
      // apply RAS: r_core (size core_n) -> z_core (size core_n)
      void apply_RAS(const vector<double> &r_core, vector<double> &z_core) const {
         z_core.assign(core_n, 0.0);
@@ -199,7 +200,7 @@ class LocalProblem {
             }
         }
 
-        VectorXd xloc = eig_lu.solve(r_loc);
+        VectorXd xloc = eig_lu.solve(r_loc);  // solve A_loc x = r using the pre-calculated LU factorization
 
         for (int j = 0; j < core_ny; ++j)
             for (int i = 0; i < core_nx; ++i) {
@@ -236,8 +237,8 @@ class LocalProblem {
         double hx, hy, mu, c;
 
         // eigen LU
-        MatrixXd A_loc;
-        PartialPivLU<MatrixXd> eig_lu;
+        SparseMatrix<double> A_loc;
+        SparseLU<SparseMatrix<double>> eig_lu; // stores the LU factorization
         bool lu_ok;
 
 
@@ -245,10 +246,12 @@ class LocalProblem {
         lu_ok = true;
         if (ex_n <= 0) { lu_ok = false; return; }
 
-        A_loc = MatrixXd::Zero(ex_n, ex_n);
-        double idx2 = 1.0/(hx*hx);
-        double idy2 = 1.0/(hy*hy);
-        double diag_center = mu * (2.0*idx2 + 2.0*idy2) + c;
+        A_loc.resize(ex_n, ex_n);
+        vector<Triplet<double>> triplets;  // build a local matrix representing the 5-point stencil Finite Difference discretization
+                                           // stores the coefficients of the local system including the overlap
+        double idx2 = 1.0 /(hx*hx);
+        double idy2 = 1.0 /(hy*hy);
+        double diag_center = mu * (2.0*idx2 + 2.0*idy2) + c;  // main diagonal value
         double diag_off_x = -mu * idx2;
         double diag_off_y = -mu * idy2;
 
@@ -258,17 +261,17 @@ class LocalProblem {
                 int gi = ex_i0 + i;
                 int gj = ex_j0 + j;
                 if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) {
-                    A_loc(row,row) = 1.0;
+                    triplets.push_back(Triplet<double>(row,row,1.0));
                     continue;
                 }
-                A_loc(row,row) = diag_center;
-                if (gi - 1 >= ex_i0) A_loc(row, idlocal(i-1,j,ex_nx)) = diag_off_x;
-                if (gi + 1 <= ex_i1) A_loc(row, idlocal(i+1,j,ex_nx)) = diag_off_x;
-                if (gj - 1 >= ex_j0) A_loc(row, idlocal(i,j-1,ex_nx)) = diag_off_y;
-                if (gj + 1 <= ex_j1) A_loc(row, idlocal(i,j+1,ex_nx)) = diag_off_y;
+                triplets.push_back(Triplet<double>(row,row, mu * (2.0*idx2 + 2.0*idy2) + c));  // main diagonal value
+                if (gi - 1 >= ex_i0) triplets.push_back(Triplet<double>(row, idlocal(i-1,j,ex_nx), diag_off_x));
+                if (gi + 1 <= ex_i1) triplets.push_back(Triplet<double>(row, idlocal(i+1,j,ex_nx), diag_off_x));
+                if (gj - 1 >= ex_j0) triplets.push_back(Triplet<double>(row, idlocal(i,j-1,ex_nx), diag_off_y));
+                if (gj + 1 <= ex_j1) triplets.push_back(Triplet<double>(row, idlocal(i,j+1,ex_nx), diag_off_y));
             }
         }
-
+        A_loc.setFromTriplets(triplets.begin(), triplets.end());
         eig_lu.compute(A_loc);
     }
 };
@@ -277,6 +280,8 @@ class LocalProblem {
 // ---------- SchwarzSolver (2D) -----
 // Incapsula lo scambio halo, il matvec, l'applicazione del precondizionatore locale e
 // l'algoritmo GMRES restartable. Ha interfaccia simile all'esempio 1D (run()).
+
+// this class handles MPI communication + global iterative algorithm (GMRES)
 class SchwarzSolver {
     public:
     SchwarzSolver(MPI_Comm cart_comm, int rank, int size,
