@@ -4,7 +4,6 @@
 
 // coarse solver running on all processes (not only on rank 0)
 // - CoarseSolver Constructor: every rank builds and factorizes the small coarse matrix
-    // since the coarse grid is typically very small, the redundant memory and computation cost is negligible compared to the communication cost of gathering everything to rank 0
 // - apply_TwoLevel: instead of gather_solution, it uses MPI_Allgather  (allows every process to have the full residual vector)
 // - solve: every process performs the restriction, the LU solve and the prolongation locally (eliminates the need for MPI_Bcast and reduces synchronization bottlenecks)
 
@@ -295,10 +294,10 @@ class SchwarzSolver {
           hx(hx), hy(hy), mu(mu), c(c), left(left), right(right), down(down), up(up),
           local(localProb)
     {
-         core_n = core_nx * core_ny;
+        core_n = core_nx * core_ny;
         halo_nx = core_nx + 2; halo_ny = core_ny + 2;
         x_halo.assign(halo_nx * halo_ny, 0.0);
-        send_left.assign(core_ny, 0.0); recv_left.assign(core_ny, 0.0);
+        send_left.assign(core_ny, 0.0); recv_left.assign(core_ny, 0.0);       // buffer vectors used to package edge data before sending across the network
         send_right.assign(core_ny, 0.0); recv_right.assign(core_ny, 0.0);
         send_bottom.assign(core_nx, 0.0); recv_bottom.assign(core_nx, 0.0);
         send_top.assign(core_nx, 0.0); recv_top.assign(core_nx, 0.0);
@@ -323,19 +322,19 @@ class SchwarzSolver {
     }
 
 
+     // iterative method for solving non-symmetric systems
      void run(int max_it, double tol, int m_restart) {
         // rhs_pre = M^{-1} rhs
-        vector<double> rhs_pre(core_n, 0.0);
-        apply_RAS(b_local, rhs_pre);
+        vector<double> x(core_n, 0.0), rhs_pre(core_n, 0.0);
+        apply_TwoLevel(b_local, rhs_pre);
 
         double rhs_norm = sqrt(dot_local(rhs_pre, rhs_pre));
         if (rhs_norm == 0.0) rhs_norm = 1.0;
 
         // inizial residual r = rhs_pre - M^{-1} A x
-        vector<double> x(core_n, 0.0);
         vector<double> Ax(core_n, 0.0), MInvAx(core_n, 0.0);
         matvec(x, Ax);
-        apply_RAS(Ax, MInvAx);
+        apply_TwoLevel(Ax, MInvAx);
 
         vector<double> r(core_n, 0.0);
         for (int i = 0; i < core_n; ++i) r[i] = rhs_pre[i] - MInvAx[i];
@@ -351,7 +350,7 @@ class SchwarzSolver {
 
     private:
 
-     MPI_Comm cart;
+    MPI_Comm cart;
     int rank, size;
     int Nx, Ny;
     int ci_s, cj_s;
@@ -360,6 +359,7 @@ class SchwarzSolver {
     int left, right, down, up;
 
     LocalProblem *local; // non-owning pointer: ownership in main
+    CoarseSolver *coarse;
 
     // halos and buffers
     int halo_nx, halo_ny;
@@ -368,6 +368,29 @@ class SchwarzSolver {
     vector<double> send_bottom, recv_bottom, send_top, recv_top;
 
     vector<double> b_local;
+
+    // --- TWO-LEVEL PRECONDITIONER ---
+    void apply_TwoLevel(const vector<double> &r_local, vector<double> &z_local) {
+        // 1. level 1: RAS Fine Correction  (fine level)
+        local->apply_RAS(r_local, z_local);
+            // each processor solves its local system (with A_loc) using the pre-calculated LU
+            // this fixes "high-frequency" (local) errors
+
+        // 2. level 2: Coarse Grid Correction
+        vector<double> r_glob(Nx * Ny, 0.0);
+        allgather_global_vector(r_local, r_glob);
+            // all processes now have the global residual map
+
+        vector<double> e_local_coarse(core_n, 0.0);
+        coarse->solve(r_glob, e_local_coarse, ci_s, cj_s, core_nx, core_ny);
+            // every process solves the global coarse system and prolongs only to its local core points
+
+        // Add coarse correction to RAS result (Additive Schwarz)
+        // the local RAS result and the global coarse result are added together
+        for (int i = 0; i < core_n; ++i) {
+            z_local[i] += e_local_coarse[i];
+        }
+    }
 
 
     double dot_local(const vector<double> &a, const vector<double> &b) const {
