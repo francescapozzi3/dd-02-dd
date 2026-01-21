@@ -11,8 +11,8 @@ fname = "solution.csv"
 created_demo = False
 
 if not os.path.exists(fname):
-    print("File 'solution.csv' non trovato. Genero una soluzione di esempio (demo) e la salvo come 'solution.csv'.")
-    # demo parameters (match the defaults in your C++ code)
+    print("The file 'solution.csv' was not found. I'll generate a demo solution and save it as 'solution.csv'.")
+    # demo parameters (match the defaults in C++ code)
     Nx = 51; Ny = 51; mu = 0.01; c = 5.0
     hx = 1.0 / (Nx - 1); hy = 1.0 / (Ny - 1)
     N = Nx * Ny
@@ -39,7 +39,7 @@ if not os.path.exists(fname):
                 vals.extend([center, offx, offx, offy, offy])
                 b[k] = 1.0  # f=1
     A = sp.csr_matrix((vals,(rows,cols)), shape=(N,N))
-    print("Risolvo il sistema di riferimento (direct sparse solve) per la demo...")
+    print("Solve reference problem (direct sparse solve)")
     u_demo = spla.spsolve(A, b)
     # write solution.csv
     with open(fname, "w") as f:
@@ -48,7 +48,7 @@ if not os.path.exists(fname):
             for i in range(Nx):
                 f.write(f"{i*hx},{j*hy},{u_demo[i + j*Nx]}\n")
     created_demo = True
-    print("Demo salvata in 'solution.csv'.")
+    print("Demo saved in 'solution.csv'.")
 
 # Load solution.csv created by your code (or the demo)
 df = pd.read_csv(fname)
@@ -83,7 +83,7 @@ for j in range(Ny):
 
 A = sp.csr_matrix((vals,(rows,cols)), shape=(N,N))
 
-print("Risolvo il sistema di riferimento (direct sparse solve)...")
+print("Solve reference problem (direct sparse solve)...")
 u_ref = spla.spsolve(A, b)
 U_ref = u_ref.reshape((Ny,Nx))
 
@@ -99,20 +99,19 @@ print(f"Max abs difference: {max_abs:.6e}")
 # create mesh for plotting
 X, Y = np.meshgrid(x_unique, y_unique)
 
-# ---------- Efficient 2D visualization: pcolormesh (faster for large grids) ----------
+# ---------- Efficient 2D visualization: pcolormesh ----------
 plt.figure(figsize=(6,5))
-plt.title("Soluzione MPI (pcolormesh) - efficiente")
-# shading='auto' evita warning quando Nx/ Ny coincidono con dimensioni
+plt.title("MPI solution (pcolormesh)")
 pcm = plt.pcolormesh(X, Y, U_file, shading='auto')
 plt.colorbar(pcm)
 plt.xlabel("x"); plt.ylabel("y")
-# overlay di punti: se troppi punti li downsampleiamo per non rallentare la figura
+# downsample if we have to many points
 num_points = X.size
 max_scatter = 2000
 if num_points <= max_scatter:
     plt.scatter(X.ravel(), Y.ravel(), s=6, c='k', alpha=0.25)
 else:
-    # random sample dei punti da mostrare
+    # random sample of the points to show
     idx = np.random.choice(num_points, size=max_scatter, replace=False)
     plt.scatter(X.ravel()[idx], Y.ravel()[idx], s=6, c='k', alpha=0.25)
 plt.tight_layout()
@@ -120,7 +119,7 @@ plt.savefig("solution_mpi_pmesh.png")
 
 # --- Plot 1: MPI solution (contourf) ---
 plt.figure(figsize=(6,5))
-plt.title("Soluzione MPI (da solution.csv) - contourf")
+plt.title("MPI slution - contourf")
 plt.contourf(X, Y, U_file, levels=50)
 plt.colorbar()
 plt.xlabel("x"); plt.ylabel("y")
@@ -129,7 +128,7 @@ plt.savefig("solution_mpi.png")
 
 # --- Plot 2: Reference direct solve (contourf) ---
 plt.figure(figsize=(6,5))
-plt.title("Soluzione di riferimento (direct sparse solve)")
+plt.title("Reference solution (direct sparse solve)")
 plt.contourf(X, Y, U_ref, levels=50)
 plt.colorbar()
 plt.xlabel("x"); plt.ylabel("y")
@@ -138,14 +137,14 @@ plt.savefig("solution_ref.png")
 
 # --- Plot 3: Difference ---
 plt.figure(figsize=(6,5))
-plt.title("Differenza (MPI - riferimento)")
+plt.title("Difference (MPI - reference)")
 plt.contourf(X, Y, diff, levels=50)
 plt.colorbar()
 plt.xlabel("x"); plt.ylabel("y")
 plt.tight_layout()
 plt.savefig("solution_diff.png")
 
-# --- Plot 4: central slice comparison (style changed) ---
+# --- Plot 4: central slice comparison ---
 yc = 0.5
 j_center = np.argmin(np.abs(y_unique - yc))
 plt.figure(figsize=(7,4))
@@ -153,7 +152,7 @@ plt.title(f"Taglio centrale y≈{y_unique[j_center]:.4f} (riga j={j_center})")
 # MPI: solida con marker cerchio
 plt.plot(x_unique, U_file[j_center,:], label="MPI (file)", linestyle='-', linewidth=2, marker='o', markersize=4)
 # Riferimento: tratteggiata con marker quadrato
-plt.plot(x_unique, U_ref[j_center,:], label="Riferimento (direct)", linestyle='--', linewidth=2, marker='s', markersize=4)
+plt.plot(x_unique, U_ref[j_center,:], label="Riferimento (direct)", linestyle='--', linewidth=2, marker='s', markersize=2)
 plt.xlabel("x"); plt.ylabel("u(x,y)")
 plt.legend()
 plt.grid(True)
@@ -163,9 +162,9 @@ plt.savefig("solution_slice.png")
 # ---------- 3D surface plot (MPI) ----------
 fig = plt.figure(figsize=(8,6))
 ax = fig.add_subplot(111, projection='3d')
-ax.set_title('Superficie 3D: Soluzione MPI')
+ax.set_title('3D surface: MPI solution')
 # plot_surface può essere costoso: per griglie molto grandi si puo' downsample
-max_side = 200  # se Nx o Ny > max_side, downsample per performance
+max_side = 200  #if Nx o Ny > max_side, downsample for performance
 step_x = max(1, Nx // max_side)
 step_y = max(1, Ny // max_side)
 Xs = X[::step_y, ::step_x]
@@ -188,13 +187,6 @@ ax.set_xlabel('x'); ax.set_ylabel('y'); ax.set_zlabel('u')
 plt.tight_layout()
 plt.savefig('solution_3d_surface_ref.png')
 
-print("Plotte salvati in: solution_mpi.png, solution_mpi_pmesh.png, solution_ref.png, solution_diff.png, solution_slice.png, solution_3d_surface_mpi.png, solution_3d_surface_ref.png")
+print("Plots saved in: solution_mpi.png, solution_mpi_pmesh.png, solution_ref.png, solution_diff.png, solution_slice.png, solution_3d_surface_mpi.png, solution_3d_surface_ref.png")
 if created_demo:
-    print("Ho creato un file demo 'solution.csv' perché il tuo file non era presente. Poi ho generato i plot dalla demo.")
-
-# Opzionale: salvare il set completo di punti (x,y,u) in file .npz per caricamenti rapidi futuri
-try:
-    np.savez_compressed('solution_grid.npz', x=x_unique, y=y_unique, u=U_file)
-    print("Salvato 'solution_grid.npz' per caricamenti rapidi successivi.")
-except Exception as e:
-    print("Non sono riuscito a salvare solution_grid.npz:", e)
+    print("(Note: 'solution.csv' was generated as a demo solution.)")
