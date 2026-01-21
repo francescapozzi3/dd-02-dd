@@ -62,7 +62,7 @@ CoarseSolver::CoarseSolver(int _Nx, int _Ny, int _Ncx, int _Ncy, double mu, doub
 }
 
 // Solve the coarse problem: Sparse Restriction -> Solve -> Prolongation
-void solve(const vector<double>& r_local, vector<double>& e_local, 
+void solve(const Eigen::VectorXd& r_local, const Eigen::VectorXd& e_local, 
            int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use) 
 {
         int n_coarse = Ncx * Ncy;
@@ -384,7 +384,7 @@ Solver::Solver(MPI_Comm cart_comm, int rank_, int size_,
 }
 
 
-void Solver::apply_TwoLevel(const vector<double> &r_local, vector<double> &z_local)
+void Solver::apply_TwoLevel(const Eigen::VectorXd& r_local, const Eigen::VectorXd& z_local)
 {
     // 1. Level 1: RAS Fine Correction  (fine level)
     local->apply_RAS(r_local, z_local);
