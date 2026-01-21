@@ -396,13 +396,14 @@ class SchwarzSolver {
     double dot_local(const vector<double> &a, const vector<double> &b) const {
         double s = 0.0;
         int n = (int)a.size();
-        for (int i = 0; i < n; ++i) s += a[i] * b[i];
+        for (int i = 0; i < n; ++i) 
+            s += a[i] * b[i];
         double sglob = 0.0;
         MPI_Allreduce(&s, &sglob, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         return sglob;
     }
 
-    void matvec(const vector<double> &p, vector<double> &Ap) {
+    void matvec(const vector<double> &p, vector<double> &Ap) {   // to compute matrix-vector product
         double idx2 = 1.0/(hx*hx);
         double idy2 = 1.0/(hy*hy);
         double diag_center = mu * (2.0*idx2 + 2.0*idy2) + c;
@@ -468,10 +469,12 @@ class SchwarzSolver {
         }
     }
 
+    /*
     void apply_RAS(const vector<double> &r, vector<double> &z) const {
         // delegate to local problem (same semantics)
         local->apply_RAS(r, z);
     }
+    */
 
      // gather solution (identical semantic to original: rank0 collects core pieces and writes solution.csv)
     void gather_solution(const vector<double> &x_local) {
