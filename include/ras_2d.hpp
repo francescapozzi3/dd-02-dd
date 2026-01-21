@@ -36,16 +36,16 @@ public:
 
 // CoarseSolver
 class CoarseSolver {
-    int Ncx, Ncy; // Coarse grid dimensions
-    int Nx, Ny;   // Fine grid dimensions
+    int Nx, Ny;    // Fine grid dimensions
+    int Ncx, Ncy;  // Coarse grid dimensions
     Eigen::SparseMatrix<double> Ac;
     Eigen::SparseLU<Eigen::SparseMatrix<double>> lu_coarse;
     int rank;
 
   public:
-    CoarseSolver(int _Nx, int _Ny, int _Ncx, int _Ncy, double mu, double c, int _rank);
+    CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_);
 
-    void solve(const Eigen::VectorXd& r_local, const Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use);
+    void solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use);
 };
 
 
@@ -169,7 +169,10 @@ private:
   void matvec(const Eigen::VectorXd& p,
               Eigen::VectorXd& Ap);
 
-  // Gather final solution: rank 0 receives (info + buffer) and writes solution.csv.
+  // Apply the preconditioner (delegated to LocalProblem)
+  void apply_RAS(const Eigen::VectorXd& r, Eigen::VectorXd& z) const;
+
+  // Gather final solution: rank 0 receives (info + buffer) and writes solution.csv
   void gather_and_save(const Eigen::VectorXd& x_local);
 
   // Two-Level preconditioner
