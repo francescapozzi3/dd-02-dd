@@ -26,9 +26,10 @@ void Partition::compute_1d_partition(int N, int nb, int proc_id, int& start, int
 // ============================================================
 
 CoarseSolver::CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_)
-    : Nx(_Nx), Ny(_Ny), 
-      Ncx(_Ncx), Ncy(_Ncy), 
-      rank(_rank)
+    : Nx(Nx_), Ny(Ny_), 
+      Ncx(Ncx_), Ncy(Ncy_), 
+      mu(mu_), c(c_),
+      rank(rank_)
 {
     // Every rank now stores and solves the coarse system 
     int n_coarse = Ncx * Ncy;
@@ -64,7 +65,7 @@ CoarseSolver::CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, dou
                 if (j < Ncy - 1) add_trip(row, idlocal(i, j + 1, Ncx), -mu * idy2);
             }
         }
-        Ac.setFromTriplets(triplets.begin(), triplets.end());
+        Ac.setFromTriplets(trips.begin(), trips.end());
         lu_coarse.compute(Ac); 
 }
 
@@ -222,7 +223,6 @@ void LocalProblem::apply_RAS(const Eigen::VectorXd& r_core,
             
             z_core[cid] = z_loc[eid];
         }
-    }
 }
 
 
@@ -284,7 +284,7 @@ void LocalProblem::assemble_and_factorize() {
     A_loc.makeCompressed();
 
     // Sparse LU factorization
-    eig_lu.compute(A_loc);
+    lu.compute(A_loc);
 
     if (lu.info() != Eigen::Success) {
         lu_ok = false;
@@ -405,7 +405,7 @@ void Solver::apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_l
 
     // 2. Level 2: Coarse Grid Correction
     Eigen::VectorXd e_local_coarse = Eigen::VectorXd::Zero(core_n);
-    coarse->solve(r_local, e_local_coarse, core_i0, c0re_j0, core_nx, core_ny, cart);
+    coarse->solve(r_local, e_local_coarse, core_i0, core_j0, core_nx, core_ny, cart);
 
     // Add coarse correction to RAS result 
     for (int i = 0; i < core_n; ++i) {
@@ -572,7 +572,7 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local) {
             }
 
         // Rank 0 writes solution.csv
-        ofstream ofs("solution.csv");
+        std::ofstream ofs("solution.csv");
         ofs << "x,y,u\n";
         for (int j = 0; j < Ny; ++j) {
             for (int i = 0; i < Nx; ++i) {
