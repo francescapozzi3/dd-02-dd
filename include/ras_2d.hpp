@@ -140,7 +140,8 @@ public:
                 int cj_s_, int core_ny_,
                 double hx_, double hy_, double mu_, double c_,
                 int left_, int right_, int down_, int up_,
-                LocalProblem* localProb);
+                LocalProblem* localProb,
+                CoarseSolver *coarseProb );
 
   // Ownership of LocalProblem is not transferred
   ~Solver() = default;
@@ -175,6 +176,9 @@ private:
   // Gather final solution: rank 0 receives (info + buffer) and writes solution.csv.
   void gather_and_save(const Eigen::VectorXd& x_local);
 
+  // Two-Level preconditioner
+  void apply_TwoLevel(const vector<double> &r_local, vector<double> &z_local);
+
 private:
   MPI_Comm cart;
   int rank, size;
@@ -190,6 +194,7 @@ private:
 
   // Non-owning
   LocalProblem* local;
+  CoarseSolver* coarse;
 
   // Halo storage (core + ghost layer 1 cell)
   int halo_nx, halo_ny;
