@@ -34,8 +34,22 @@ public:
 };
 
 
-// Assemble and solve local problems on extended subdomains
+// CoarseSolver
+class CoarseSolver {
+    int Ncx, Ncy; // Coarse grid dimensions
+    int Nx, Ny;   // Fine grid dimensions
+    SparseMatrix<double> Ac;
+    SparseLU<SparseMatrix<double>> lu_coarse;
+    int rank;
 
+  public:
+    CoarseSolver(int _Nx, int _Ny, int _Ncx, int _Ncy, double mu, double c, int _rank);
+
+    void solve(const vector<double>& r_local, vector<double>& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use);
+}
+
+
+// Assemble and solve local problems on extended subdomains
 class LocalProblem {
 public:
 
