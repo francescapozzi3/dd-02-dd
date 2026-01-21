@@ -286,7 +286,7 @@ void assemble_and_factorize() {
 
 
 // ============================================================
-// Wrapper classes for GMRES 
+// WRAPPER CLASSES FOR GMRES 
 // ============================================================
 //
 // Adapt GMRES requirements to our code
@@ -329,7 +329,7 @@ public:
 
 
 // ============================================================
-// Solver
+// SOLVER
 // ============================================================
 
 Solver::Solver(MPI_Comm cart_comm, int rank_, int size_,
@@ -338,7 +338,7 @@ Solver::Solver(MPI_Comm cart_comm, int rank_, int size_,
                              int cj_s_, int core_ny_,
                              double hx_, double hy_, double mu_, double c_,
                              int left_, int right_, int down_, int up_,
-                             LocalProblem* localProb)
+                             LocalProblem* localProb, CoarseSolver *coarseProb)
   : cart(cart_comm),
     rank(rank_), size(size_),
     Nx(Nx_), Ny(Ny_),
@@ -347,7 +347,8 @@ Solver::Solver(MPI_Comm cart_comm, int rank_, int size_,
     core_n(core_nx_ * core_ny_),
     hx(hx_), hy(hy_), mu(mu_), c(c_),
     left(left_), right(right_), down(down_), up(up_),
-    local(localProb)
+    local(localProb),
+    coarse(coarseProb)
 {
     // Halo = core + 1 layer ghost cells on each side
     halo_nx = core_nx + 2;
