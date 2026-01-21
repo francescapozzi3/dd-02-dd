@@ -22,6 +22,106 @@ void Partition::compute_1d_partition(int N, int nb, int proc_id, int& start, int
 
 
 // ============================================================
+// COARSE SOLVER
+// ============================================================
+
+CoarseSolver::CoarseSolver(int _Nx, int _Ny, int _Ncx, int _Ncy, double mu, double c, int _rank)
+    : Nx(_Nx), Ny(_Ny), 
+      Ncx(_Ncx), Ncy(_Ncy), 
+      rank(_rank)
+{
+    // Every rank now stores and solves the coarse system 
+    int n_coarse = Ncx * Ncy;
+    Ac.resize(n_coarse, n_coarse);
+    vector<Triplet<double>> triplets;  // Global matrix representing the PDE on the coarse grid
+
+    double hcx = 1.0 / (Ncx - 1);
+    double hcy = 1.0 / (Ncy - 1);
+    double idx2 = 1.0 / (hcx * hcx);
+    double idy2 = 1.0 / (hcy * hcy);
+
+    // Assemble coarse system matrix 
+    for (int j = 0; j < Ncy; ++j) {
+            for (int i = 0; i < Ncx; ++i) {
+                int row = idlocal(i, j, Ncx);   // 2D index to a 1D row index
+                if (i == 0 || i == Ncx-1 || j == 0 || j == Ncy-1) {
+                    triplets.push_back(Triplet<double>(row, row, 1.0));
+                    // Dirichlet boundary condition (fix the value at the boundary)
+                    continue;
+                }
+                triplets.push_back(Triplet<double>(row, row, mu * (2*idx2 + 2*idy2) + c));
+                triplets.push_back(Triplet<double>(row, idlocal(i-1, j, Ncx), -mu * idx2));
+                triplets.push_back(Triplet<double>(row, idlocal(i+1, j, Ncx), -mu * idx2));
+                triplets.push_back(Triplet<double>(row, idlocal(i, j-1, Ncx), -mu * idy2));
+                triplets.push_back(Triplet<double>(row, idlocal(i, j+1, Ncx), -mu * idy2));
+                // build the 5-point finite difference stencil (consider interior nodes)
+            }
+        }
+        Ac.setFromTriplets(triplets.begin(), triplets.end());
+        lu_coarse.compute(Ac); 
+}
+
+// Solve the coarse problem: Sparse Restriction -> Solve -> Prolongation
+void solve(const vector<double>& r_local, vector<double>& e_local, 
+           int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use) 
+{
+        int n_coarse = Ncx * Ncy;
+        // Each process creates a small local contribution vector
+        VectorXd rc_local_contrib = VectorXd::Zero(n_coarse);  
+        VectorXd rc = VectorXd::Zero(n_coarse);
+        
+        // Sparse Restriction: Injection 
+        // Each process only samples points that fall within its local core domain
+        double rx = (double)(Nx - 1) / (Ncx - 1);
+        double ry = (double)(Ny - 1) / (Ncy - 1);
+
+        for (int jc = 0; jc < Ncy; ++jc) {
+            int fine_gj = (int)round(jc * ry);    // Global fine Y index
+            if (fine_gj >= cj_s && fine_gj < cj_s + core_ny) {   
+                for (int ic = 0; ic < Ncx; ++ic) {
+                    int fine_gi = (int)round(ic * rx);   // Global fine X index
+                    if (fine_gi >= ci_s && fine_gi < ci_s + core_nx) {
+                        int local_idx = idlocal(fine_gi - ci_s, fine_gj - cj_s, core_nx);
+                        rc_local_contrib[idlocal(ic, jc, Ncx)] = r_local[local_idx];
+                    }
+                }
+            }
+        }
+
+        // Communicate only the coarse grid data 
+        MPI_Allreduce(rc_local_contrib.data(), rc.data(), n_coarse, MPI_DOUBLE, MPI_SUM, comm_to_use);
+
+        // Solve the global system on the coarse grid
+        VectorXd ec = lu_coarse.solve(rc);  
+
+        // Prolongation: Bi-linear Interpolation back to fine grid
+        // Every process calculates only its local piece of the global error correction
+        e_local.assign(core_nx * core_ny, 0.0);
+        for (int j = 0; j < core_ny; ++j) {
+            for (int i = 0; i < core_nx; ++i) {
+                int gi = ci_s + i;
+                int gj = cj_s + j;
+
+                double xc = gi / rx; 
+                double yc = gj / ry;
+                int i0 = (int)xc; 
+                int i1 = min(i0 + 1, Ncx - 1);
+                int j0 = (int)yc; 
+                int j1 = min(j0 + 1, Ncy - 1);
+                double dx = xc - i0; 
+                double dy = yc - j0;
+                
+                e_local[idlocal(i, j, core_nx)] =            // Bilinear interpolation
+                    (1 - dx) * (1 - dy) * ec[idlocal(i0, j0, Ncx)] +
+                    dx * (1 - dy) * ec[idlocal(i1, j0, Ncx)] +
+                    (1 - dx) * dy * ec[idlocal(i0, j1, Ncx)] +
+                    dx * dy * ec[idlocal(i1, j1, Ncx)];
+            }
+        }
+    }
+
+
+// ============================================================
 // LOCAL PROBLEM
 // ============================================================
 
