@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
   if (argc >= 9)   max_it  = std::stoi(argv[8]);
   if (argc >= 10)  tol     = std::stod(argv[9]);
   if (argc >= 11)  restart = std::stoi(argv[10]);
+  if (argc >= 13) { Ncx    = std::stoi(argv[11]); Ncy = std::stoi(argv[12]); }
 
   // Processes topology (MPI cartesian grid): divide processes into a Px*Py grid
   int dims[2] = {0, 0};     // 0 allows MPI to choose best subdivision
