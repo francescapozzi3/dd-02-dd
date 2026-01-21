@@ -17,17 +17,17 @@
 #include <iomanip>
 #include <algorithm>
 
-#include <Eigen/Dense>
-#include <Eigen/LU>
+#include <Eigen/Sparse>
+#include <Eigen/SparseLU>
 
 using namespace std;
 using namespace Eigen;
 
 // ---------- utility free inline ----------
 inline int idlocal(int i, int j, int nx) { return i + j * nx; }
+    // converts 2D grid coordinates into a single 1D index for memory storage (row-major)
 
-
-// ---------- Partition helper (stile: class con metodo statico) ----------
+// ---------- Partition helper ----------
 class Partition {
     public:
     static void compute_1d_partition(int N, int nb, int pid, int &start, int &len) {
@@ -36,8 +36,8 @@ class Partition {
         start = pid * base + std::min(pid, rest);
         len = base + (pid < rest ? 1 : 0);
     }
+};     // splits the N grid points into nb processes
 
-};
 
 // ---------- LocalProblem (2D) -----
 // Incapsula la costruzione della matrice locale estesa, la fattorizzazione con Eigen
