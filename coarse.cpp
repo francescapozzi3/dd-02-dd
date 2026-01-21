@@ -134,6 +134,7 @@ public:
 // Incapsula la costruzione della matrice locale estesa, la fattorizzazione con Eigen
 // e l'applicazione del precondizionatore RAS (solve locale + restrizione).
 
+// class to manage the overlapping subdomains
 class LocalProblem {
     public:
     LocalProblem() : ex_i0(0), ex_i1(-1), ex_j0(0), ex_j1(-1), ex_nx(0), ex_ny(0), ex_n(0),
@@ -146,24 +147,29 @@ class LocalProblem {
               int _Nx, int _Ny, double _hx, double _hy,
               double _mu, double _c)
     {
-
+        // extended
         ex_i0 = _ex_i0; ex_i1 = _ex_i1; ex_j0 = _ex_j0; ex_j1 = _ex_j1;
         ex_nx = (ex_i1 >= ex_i0) ? (ex_i1 - ex_i0 + 1) : 0;
         ex_ny = (ex_j1 >= ex_j0) ? (ex_j1 - ex_j0 + 1) : 0;
         ex_n = ex_nx * ex_ny;
 
-        ci_s = _ci_s; ci_e = _ci_e; cj_s = _cj_s; cj_e = _cj_e;
-        core_nx = (ci_e >= ci_s) ? (ci_e - ci_s + 1) : 0;
+        // core
+        ci_s = _ci_s; ci_e = _ci_e; cj_s = _cj_s; cj_e = _cj_e;   // core index start (global coordinates)
+        core_nx = (ci_e >= ci_s) ? (ci_e - ci_s + 1) : 0;         // number of points in the core area
         core_ny = (cj_e >= cj_s) ? (cj_e - cj_s + 1) : 0;
-        core_n = core_nx * core_ny;
+        core_n = core_nx * core_ny;                               // total points in the core
 
         Nx = _Nx; Ny = _Ny; hx = _hx; hy = _hy; mu = _mu; c = _c;
+        // Nx and Ny are the total number of points in the global grid along the X and Y axes
+        // hx, hy is the mesh size (distance between points)
+        // mu is the diffusion coefficient
+        // c is the reaction coefficient
 
         assemble_and_factorize();
 
     }
 
-     bool is_lu_ok() const { return lu_ok; }
+     // bool is_lu_ok() const { return lu_ok; }
 
      // apply RAS: r_core (size core_n) -> z_core (size core_n)
      void apply_RAS(const vector<double> &r_core, vector<double> &z_core) const {
