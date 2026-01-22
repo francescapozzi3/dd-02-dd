@@ -84,7 +84,7 @@ distclean: clean
 	rm -rf $(BUILD_DIR) $(OUTPUT_DIR)
 
 # Phony targets
-.PHONY: all directories run run_seq clean distclean
+.PHONY: all directories run clean distclean
 
 # Dependencies (header files)
 $(BUILD_DIR)/main.o: $(INC_DIR)/ras_2d.hpp
