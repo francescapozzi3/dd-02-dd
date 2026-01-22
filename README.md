@@ -282,8 +282,8 @@ The algorithm provides a **realistic strong scaling**, proving that MPI communic
 Fixed number of processors: 20.
 
 
-| Global grid size | Coarse grid size | Overlap size |Number of iterations | Timing | 
-| :---: | :---: | :---: | :---: |
+| Global grid size | Coarse grid size | Overlap size | Number of iterations | Timing | 
+| :---: | :---: | :---: | :---: | :---: |
 | 5000x5000 |250x250| 5 | 327 | 703.2 s |
 | 2500x2500 | 120x120 | 2 | 279 | 121.184 s | 
 | 2500x1000 | 120x38 | 2 | 270 | 33.54 s |
