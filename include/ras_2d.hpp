@@ -169,7 +169,7 @@ public:
   //   3.  Restart loop until relres <= tol, or total_iters >= max_it
   //   4.  At the end call gather_and_save(x)
  
-  void run(int max_it, double tol, int m_restart);
+  void run(int max_it, double tol, int m_restart, const double hx, const double hy);
 
   // Getter
   int get_core_n() const { return core_n; }
@@ -188,7 +188,7 @@ private:
   void apply_RAS(const Eigen::VectorXd& r, Eigen::VectorXd& z) const;
 
   // Gather final solution: rank 0 receives (info + buffer) and writes solution.csv
-  void gather_and_save(const Eigen::VectorXd& x_local);
+  void gather_and_save(const Eigen::VectorXd& x_local, const double hx, const double hy);
 
   // Two-Level preconditioner
   void apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_local);
