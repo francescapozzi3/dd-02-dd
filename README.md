@@ -305,6 +305,7 @@ Iterations number grows slowly with the problem, meaning that the **coarse solve
 
 
 | Overlap size | Number of iterations | Timing |
+| :---: | :---: | :---: |
 | 1 | 311 | 126.46 s |
 | 2 | 270 | 33.54 s |
 | 5 | 233 | 103.594 s |
