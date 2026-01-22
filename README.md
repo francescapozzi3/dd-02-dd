@@ -261,6 +261,7 @@ where:
 - Coarse grid size: 120 $\times$ 120
 - Overlap size: 2
 
+
 | Number of processors | Number of iterations | Timing | Speedup w.r.t. 2 processors case |
 | :------------------: | :------------------: | :----: | :---: |
 | 2 | 158 | 617.024 s | 1.0 |
@@ -268,6 +269,7 @@ where:
 | 8 | 227 | 215.841 s | 2.86 |
 | 16 | 268 | 135.133 s | 4.57 |
 | 20 | 279 | 121.184 s | 5.09 |
+
 
 The algorithm provides a **realistic strong scaling**, proving that MPI communication costs are overriden by factorization costs when computations are performed by less processes.
 
@@ -279,6 +281,7 @@ The algorithm provides a **realistic strong scaling**, proving that MPI communic
 
 Fixed number of processors: 20.
 
+
 | Global grid size | Coarse grid size | Overlap size |Number of iterations | Timing | 
 | :---: | :---: | :---: | :---: |
 | 5000x5000 |250x250| 5 | 327 | 703.2 s |
@@ -286,6 +289,7 @@ Fixed number of processors: 20.
 | 2500x1000 | 120x38 | 2 | 270 | 33.54 s |
 | 1000x1000 | 38x38 | 2 | 171 | 10.004 s |
 | 500x500 | 25x25 | 1 | 85 | 1.051 s |
+
 
 Iterations number grows slowly with the problem, meaning that the **coarse solver controls global low frequencies**.
 
@@ -299,11 +303,13 @@ Iterations number grows slowly with the problem, meaning that the **coarse solve
 - Coarse grid size: 120 $\times$ 120
 - Number of processors: 20
 
+
 | Overlap size | Number of iterations | Timing |
 | 1 | 311 | 126.46 s |
 | 2 | 270 | 33.54 s |
 | 5 | 233 | 103.594 s |
 | 10 | 192 | 88.526 s |
+
 
 Overlap size equal to 2 is clearly the optimal one: it provides a moderate number of iterations and minimal communication.
 
