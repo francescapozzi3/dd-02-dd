@@ -49,8 +49,8 @@ The resulting discrete operator is given by:
 $$
 \begin{aligned}
 Au&=\frac{\mu}{h_x^2}\bigg[ -u(i-1,j)+2u(i,j)-u(i+1,j) \bigg]+ \\
-&+\frac{\mu}{h_y^2}\bigg[ -u(i,j-1)+2u(i,j)-u(i,j+1) \bigg] +
-\\ &+cu(i,j)
+&+\frac{\mu}{h_y^2}\bigg[ -u(i,j-1)+2u(i,j)-u(i,j+1) \bigg] + \\
+&+cu(i,j)
 \end{aligned}
 $$
 
