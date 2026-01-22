@@ -230,13 +230,13 @@ void LocalProblem::apply_RAS(const Eigen::VectorXd& r_core,
             }
         }
     }
-  }
+  
 
   // Local solve: z_loc = A_loc^{-1} r_loc (sparse LU)
   Eigen::VectorXd z_loc = lu.solve(r_loc);
 
     // Restriction RAS: take only values on core
-    for (int j = 0; j < core_ny; ++j)
+    for (int j = 0; j < core_ny; ++j){
         for (int i = 0; i < core_nx; ++i) {
             int gi = core_i0 + i;  // Global x index (core)
             int gj = core_j0 + j;  // Global y index (core)
@@ -252,6 +252,7 @@ void LocalProblem::apply_RAS(const Eigen::VectorXd& r_core,
             
             z_core[cid] = z_loc[eid];
         }
+  }
 }
 
 void LocalProblem::assemble_and_factorize() {
@@ -459,14 +460,6 @@ double Solver::dot_global(const Eigen::VectorXd& a,
   double global_dot = 0.0;
   MPI_Allreduce(&local_dot, &global_dot, 1, MPI_DOUBLE, MPI_SUM, cart);
   return global_dot;
-}
-
-
-void Solver::apply_RAS(const Eigen::VectorXd& r,
-                       Eigen::VectorXd& z) const
-{
-  // Delegate to LocalProblem
-  local->apply_RAS(r, z);
 }
 
 
