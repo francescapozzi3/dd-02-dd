@@ -41,6 +41,7 @@ class CoarseSolver {
     Eigen::SparseMatrix<double> Ac;
     Eigen::SparseLU<Eigen::SparseMatrix<double>> lu_coarse;
     int rank;
+    double mu,c;
 
   public:
     CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_);
