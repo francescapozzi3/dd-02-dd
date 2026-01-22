@@ -352,8 +352,18 @@ At this point, it is possible to run the program in different modes:
     ```
     to keep **default parameters** (or overwrite them from command line), and obtain the parallel MPI solution.
 
-Each command writes the global solution into a `.csv` file to be visualized using the Python script [`visualization.py`](output/visualization.py).
+Each command writes the global solution into a `.csv` file to be visualized using the Colab script [`visualization.ipynb`](output/visualization.ipynb).
 
 </br>
 
 ## Visualization
+
+Open the file [`visualization.ipynb`](output/visualization.ipynb) and click on Google Colab link. 
+
+Since Colab provides only 2 processors, choose a proper grid size and the input parameters for the PDE you want to solve. 
+
+Running the code will output various graphs comparing the numerical solution to the exact solution.
+
+
+
+
