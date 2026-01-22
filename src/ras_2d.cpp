@@ -20,6 +20,34 @@ void Partition::compute_1d_partition(int N, int nb, int proc_id, int& start, int
     len = base + (proc_id < rest ? 1 : 0);
 }
 
+int Partition::find_best_coarse_grid(int Nf, int target_ratio)
+{
+    int fine_intervals = Nf - 1;
+    if (fine_intervals <= 0) return Nf;
+
+    int best_Nc = 2; 
+    double min_diff = 1e9;
+    int desired_intervals = std::max(1, fine_intervals / target_ratio);
+
+    // Iterate through all possible divisors to find the one closest to our target
+    for (int d = 1; d <= fine_intervals; ++d) {
+      if (fine_intervals % d == 0) {
+        double diff = std::abs(d - desired_intervals);
+        if (diff < min_diff) {
+          min_diff = diff;
+          best_Nc = d + 1;
+        }
+      }
+    }
+
+    // For prime numbers
+    if (best_Nc == 2 && fine_intervals > target_ratio) {
+        return desired_intervals + 1;
+    }
+    
+    return best_Nc;
+}
+
 
 // ============================================================
 // COARSE SOLVER
