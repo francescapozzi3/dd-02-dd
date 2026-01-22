@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
   if (argc >= 9)   max_it  = std::stoi(argv[8]);
   if (argc >= 10)  tol     = std::stod(argv[9]);
   if (argc >= 11)  restart = std::stoi(argv[10]);
-  if (argc >= 13) { Ncx    = std::stoi(argv[11]);  Ncy = std::stoi(argv[12]); }
+
 
   if (argc < 2)
   {
