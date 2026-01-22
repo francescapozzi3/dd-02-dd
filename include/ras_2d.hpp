@@ -52,6 +52,7 @@ class CoarseSolver {
     int rank;
 
   public:
+
     CoarseSolver(int Nx_, int Ny_, double Lx_, double Ly_, int Ncx_, int Ncy_, double mu_, double c_, int rank_);
 
     void solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm cart);
@@ -117,6 +118,7 @@ private:
   void assemble_and_factorize();
 
 private:
+
   // Geometry: extended box subdomain (inclusive)
   int ext_i0, ext_i1, ext_j0, ext_j1;
   int ext_nx, ext_ny, ext_n;
@@ -223,5 +225,4 @@ private:
   // Local RHS (core)
   Eigen::VectorXd b_local;
 };
-
 
