@@ -4,7 +4,34 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <chrono>
 
+
+// ======================================================================
+// INPUT UTILITY
+// ======================================================================
+
+template <typename T>
+void ask_param(const std::string& msg, T& value) {
+    std::cout << msg << " [" << value << "]: ";
+    std::string line;
+    std::getline(std::cin, line);  // to read a line of text from input stream 
+
+    // Default
+    if (line.empty() || line == "." || line == "-") return; 
+
+    // Convert the user’s input string into a number of type T using a stringstream, 
+    // and only update the variable if the conversion succeeded
+    std::stringstream ss(line);
+    T tmp;
+    if (ss >> tmp)
+        value = tmp;
+}
+
+
+// ======================================================================
+// MAIN PROGRAM
+// ======================================================================
 
 int main(int argc, char** argv) {
 
@@ -43,6 +70,45 @@ int main(int argc, char** argv) {
   if (argc >= 9)   max_it  = std::stoi(argv[8]);
   if (argc >= 10)  tol     = std::stod(argv[9]);
   if (argc >= 11)  restart = std::stoi(argv[10]);
+
+  if (argc < 2)
+  {
+    // ===== INTERACTIVE PARAMETER INPUT (only on Rank 0) =====
+    if (rank == 0) {
+        std::cout << "\n Press ENTER, '.' or '-' to keep default values (shown in brackets)\n\n";
+
+        ask_param("Number of grid nodes along x", Nx);
+        ask_param("Number of grid nodes along y", Ny);
+        ask_param("Domain length along x", Lx);
+        ask_param("Domain length along y", Ly);
+        ask_param("Diffusion coefficient mu", mu);
+        ask_param("Reaction coefficient c", c);
+        ask_param("Overlap size (in number of nodes)", overlap);
+        ask_param("Maximum number of iterations", max_it);
+        ask_param("Tolerance", tol);
+        ask_param("Restart for GMRES", restart);
+    }
+
+    // BROADCAST parameters to all ranks
+    MPI_Bcast(&Nx,           1, MPI_INT,    0, MPI_COMM_WORLD);
+    MPI_Bcast(&Ny,           1, MPI_INT,    0, MPI_COMM_WORLD);
+    MPI_Bcast(&Lx,           1, MPI_INT,    0, MPI_COMM_WORLD);
+    MPI_Bcast(&Ly,           1, MPI_INT,    0, MPI_COMM_WORLD);
+    MPI_Bcast(&mu,           1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&c,            1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&overlap,      1, MPI_INT,    0, MPI_COMM_WORLD);
+    MPI_Bcast(&max_it,       1, MPI_INT,    0, MPI_COMM_WORLD);
+    MPI_Bcast(&tol,          1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&restart,      1, MPI_INT,    0, MPI_COMM_WORLD);
+  }
+
+  if (size == 1 && overlap > 0) {
+    if (rank == 0) {
+      std::cout << "WARNING: Running with 1 processor." << std::endl;
+      std::cout << "         Setting overlap=0 to avoid trivial convergence." << std::endl;
+    }
+    overlap = 0;  // Force no overlap for sequential run
+  }
 
   // Processes topology (MPI cartesian grid): divide processes into a Px*Py grid
   int dims[2] = {0, 0};     // 0 allows MPI to choose best subdivision
@@ -107,9 +173,24 @@ int main(int argc, char** argv) {
                 hx, hy, mu, c,
                 left, right, down, up,
                 local);
+  
+  // Start timer
+  MPI_Barrier(cart);  // Synchronize before timing
+  auto start = std::chrono::high_resolution_clock::now();
 
   // Execution
   solver.run(max_it, tol, restart);
+
+  // Stop timer
+  MPI_Barrier(cart);  // Synchronize after solving
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  if (cart_rank == 0) {
+    std::cout << "\n====== TIMING ======" << std::endl;
+    std::cout << "Total solver time: " << duration.count() << " ms" << std::endl;
+    std::cout << "                   " << duration.count() / 1000.0 << " s" << std::endl;
+  }
 
   delete local;
 

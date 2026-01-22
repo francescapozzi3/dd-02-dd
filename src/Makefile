@@ -6,6 +6,8 @@
 #  Personalize number of processors: make run NPROCS=4
 #  Personalize parameters:           make run NX=200 NY=200 NPROCS=16 OVERLAP=3
 #
+# RUN WITH DEFAULT ARGUMENTS: make run_args
+#
 # RUN SEQUENTIALLY: make run_seq
 #
 # CLEAN: 
@@ -46,6 +48,9 @@ MAX_IT  ?= 2000
 TOL     ?= 1e-06
 RESTART ?= 50
 
+ARGS := $(NX) $(NY) $(LX) $(LY) $(MU) $(C) \
+        $(OVERLAP) $(MAX_IT) $(TOL) $(RESTART)
+
 # Default target
 all: directories $(TARGET)
 
@@ -62,15 +67,20 @@ $(TARGET): $(OBJECTS)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
-# Run with multiple processors
+# Interactive run with multiple processors
 run: $(TARGET)
 	@echo "Running with $(NPROCS) processors..."
-	@cd $(OUTPUT_DIR) && mpirun -np $(NPROCS) $(TARGET) $(NX) $(NY) $(LX) $(LY) $(MU) $(C) $(OVERLAP) $(MAX_IT) $(TOL) $(RESTART)
+	@cd $(OUTPUT_DIR) && mpirun -np $(NPROCS) $(TARGET) 
+
+# Batch run with multiple processors
+run_args: $(TARGET)
+	@echo "Running with $(NPROCS) processors..."
+	@cd $(OUTPUT_DIR) && mpirun -np $(NPROCS) $(TARGET) $(ARGS)
 
 # Run sequentially (1 processor)
 run_seq: $(TARGET)
 	@echo "Running sequentially (1 processor)..."
-	@cd $(OUTPUT_DIR) && mpirun -np 1 $(TARGET) $(NX) $(NY) $(LX) $(LY) $(MU) $(C) $(OVERLAP) $(MAX_IT) $(TOL) $(RESTART)
+	@cd $(OUTPUT_DIR) && mpirun -np 1 $(TARGET) 
 
 # Clean build artifacts
 clean:
