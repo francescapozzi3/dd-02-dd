@@ -17,7 +17,7 @@ template <typename T>
 void ask_param(const std::string& msg, T& value) {
     std::cout << msg << " [" << value << "]: ";
     std::string line;
-    std::getline(std::cin, line);  // to read a line of text from input stream 
+    std::getline(std::cin, line);  // To read a line of text from input stream 
 
     // Default
     if (line.empty() || line == "." || line == "-") return; 
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
   MPI_Comm cart;
   MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &cart);
 
-  // Update rank and coors into new communicator
+  // Update rank and coords into new communicator
   int cart_rank;
   MPI_Comm_rank(cart, &cart_rank);
   int coords[2];  // coords[0] = x, coords[1] = y
@@ -216,12 +216,12 @@ int main(int argc, char** argv) {
       if (!ofs) {
           std::cerr << "ERROR: cannot open solution.csv for appending params." << std::endl;
       } else {
-          // compute Lx, Ly from hx, hy and Nx, Ny (main holds Lx,Ly but if not available compute here)
+          // Compute Lx, Ly from hx, hy and Nx, Ny
           double Lx_val = hx * (Nx - 1);
           double Ly_val = hy * (Ny - 1);
 
-          // write params in fixed order:
-          // params,Nx,Ny,Lx,Ly,mu,c,overlap,maxit,tol,restart
+          // Write params in fixed order:
+          // params, Nx, Ny, Lx, Ly, mu, c, overlap, maxit, tol, restart
           ofs << "params,";
           ofs << Nx << ',' << Ny << ','
               << std::setprecision(17) << Lx_val << ',' << Ly_val << ','
@@ -241,12 +241,3 @@ int main(int argc, char** argv) {
   MPI_Finalize();
   return 0;
 }
-
-
-
-
-
-
-
-
-
