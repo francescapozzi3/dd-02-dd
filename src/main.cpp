@@ -5,6 +5,8 @@
 #include <iostream>
 #include <cmath>
 #include <chrono>
+#include <fstream>
+#include <iomanip>
 
 
 // ======================================================================
@@ -204,6 +206,35 @@ int main(int argc, char** argv) {
     std::cout << "Total solver time: " << duration.count() << " ms" << std::endl;
     std::cout << "                   " << duration.count() / 1000.0 << " s" << std::endl;
   }
+
+
+  // Ensure all ranks finished IO (safety barrier)
+  MPI_Barrier(cart);
+
+  // Append parameters line to solution.csv (only rank 0)
+  if (cart_rank == 0) {
+      std::ofstream ofs("solution.csv", std::ios::app);
+      if (!ofs) {
+          std::cerr << "ERROR: cannot open solution.csv for appending params." << std::endl;
+      } else {
+          // compute Lx, Ly from hx, hy and Nx, Ny (main holds Lx,Ly but if not available compute here)
+          double Lx_val = hx * (Nx - 1);
+          double Ly_val = hy * (Ny - 1);
+
+          // write params in fixed order:
+          // params,Nx,Ny,Lx,Ly,mu,c,overlap,maxit,tol,restart
+          ofs << "params,";
+          ofs << Nx << ',' << Ny << ','
+              << std::setprecision(17) << Lx_val << ',' << Ly_val << ','
+              << mu << ',' << c << ','
+              << overlap << ',' << max_it << ','
+              << std::scientific << tol << ','
+              << std::defaultfloat << restart
+              << "\n";
+          ofs.close();
+      }
+  }
+
 
   delete local;
   delete coarse;
