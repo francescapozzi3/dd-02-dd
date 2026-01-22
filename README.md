@@ -145,7 +145,7 @@ $$
     | Key methods | Roles |
     | :---------: | :---- |
     | `compute_1d_partition(int N, int nb, int proc_id, int& start, int& len)`| Divides `N` nodes into `nb` blocks as evenly as possible, and returns the starting index (`start`) and subdomain length (`len`) for the process `proc_id`. |
-    | `find_best_coarse_grid(int Nf, int target_ratio)` | Determines the optimal coarse grid size by looking for factors of `Nf - 1` that are the closest to the `target_ratio`. |
+    | `find_best_coarse_grid(int Nf, int target_ratio)` | Determines the optimal coarse grid size by looking for factors of `Nf - 1` that are the closest to the `target_ratio` (in this case we would like the fine grid spacings to be about $1/20$ of the coarse ones). |
 
 </br>
 
@@ -156,8 +156,8 @@ $$
 
     | Key methods | Roles |
     | :---------: | :---- |
-    | `CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_)` | Assembles the matrix `Ac` defined on the coarser grid, applies on it the same differential operator as the one for the fine gird, and executes the LU factorization. |
-    | `solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use)` | Injects from the fine residual to the coarse one, solves `Ac*ec = rc` using LU factorization, and then uses bilinear interpolation to prolongate the correction to the fine grid. |
+    | `CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_)` | Assembles the matrix `Ac` defined on the coarser grid, applies on it the same differential operator as the one for the fine grid, and executes the sparse LU factorization. |
+    | `solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use)` | Injects from the fine residual to the coarse one, solves `Ac*ec = rc` using LU factorization to eliminate low frequency error components, and then uses bilinear interpolation to prolongate the correction to the fine grid. |
 
 </br>
 
@@ -186,10 +186,10 @@ $$
     | :---------: | :---- |
     | `matvec(const Eigen::VectorXd& p, Eigen::VectorXd& Ap)` | Computes the matrix-vector product `Ap = A*p` in a distributed manner, using MPI communication to exchange ghost cells and exploiting the 5-point stencil. |
     | `apply_RAS(const Eigen::VectorXd& r, Eigen::VectorXd& z)` | Delegates the RAS preconditioning to `LocalProblem`. |
-    | `apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_local)` | Applies fine RAS (`z_RAS = M_RAS^(-1)*r`), performs the coarse correction (`e_coarse = M_coarse^(-1)*r`), and then adds together the results. |
+    | `apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_local)` | Applies fine RAS, performs the coarse correction, and then adds together the results with a damping term to improve preconditioner stability. |
     | `dot_global(const Eigen::VectorXd& a, const Eigen::VectorXd& b)` | Computes the distributed scalar product exploiting `MPI_Allreduce`. |
-    | `run(int max_it, double tol, int m_restart)` | Calls preconditioned BiCGSTAB (or GMRES), and then gathers and saves the global solution. |
-    | `gather_and_save(const Eigen::VectorXd& x_local)` | Aggregates the distributed solution and saves it to a `.csv` file. |
+    | `run(int max_it, double tol, int m_restart, const double hx, const double hy)` | Calls preconditioned BiCGSTAB (or GMRES), and then gathers and saves the global solution. |
+    | `gather_and_save(const Eigen::VectorXd& x_local, const double hx, const double hy)` | Aggregates the distributed solution and saves it to a `.csv` file. |
 
 </br>
 
@@ -208,7 +208,7 @@ MPI processes are distributed into a logic **2D cartesian grid**:
 
 </br>
 
-The global `Nx`$\times$`Ny` grid is subdivided into local subdomains: each process becomes resposible for a specific core region.
+The global `Nx`$\times$`Ny` grid is subdivided into local subdomains: each process becomes responsible for a specific core region.
 
 </br>
 
@@ -227,8 +227,87 @@ After creating `LocalProblem` and `Solver`, the latter one is run using `solver.
 
 ## Performance and scaling
 
+<u>Note</u>: this implementation is intrinsically parallel.
 
+Some parameters were fixed to guarantee a simpler analysis:
+- Domain $\Omega=[0,1]^2$
+- Diffusion coefficient $\mu=1.0$
+- Reaction coefficient $c=0.1$
+- Maximum number of iterations is 5000
+- Tolerance is 1e-06
 
+In this section we will use the following formulas:
+
+$$
+\begin{aligned}
+&T_\text{ideal}(p)=T(2)\frac{2}{p} \\
+&S(p)=\frac{T(2)}{T(p)} \\
+&S_\text{ideal}(p)=\frac{p}{2} \\
+&E(p)=2\frac{S(p)}{p}
+\end{aligned}
+$$
+
+where:
+- $p$ is the number of processors
+- $T(p)$ is the parallel time with $p$ processors
+- $S(p)$ is the speedup with $p$ processors (with respect to the 2 processors case)
+- $E(p)$ is the efficiency with $p$ processors
+
+</br>
+
+### Strong scaling 
+
+- Global grid size: 2500 $\times$ 2500
+- Coarse grid size: 120 $\times$ 120
+- Overlap size: 2
+
+| Number of processors | Number of iterations | Timing | Speedup w.r.t. 2 processors case |
+| :------------------: | :------------------: | :----: | :---: |
+| 2 | 158 | 617.024 s | 1.0 |
+| 4 | 169 | 329.039 s | 1.87 |
+| 8 | 227 | 215.841 s | 2.86 |
+| 16 | 268 | 135.133 s | 4.57 |
+| 20 | 279 | 121.184 s | 5.09 |
+
+The algorithm provides a **realistic strong scaling**, proving that MPI communication costs are overriden by factorization costs when computations are performed by less processes.
+
+![Strong scaling](../dd-02-dd/performance-study/strong.png)
+
+</br>
+
+### Scaling with problem size
+
+Fixed number of processors: 20.
+
+| Global grid size | Coarse grid size | Overlap size |Number of iterations | Timing | 
+| :---: | :---: | :---: | :---: |
+| 5000x5000 |250x250| 5 | 327 | 703.2 s |
+| 2500x2500 | 120x120 | 2 | 279 | 121.184 s | 
+| 2500x1000 | 120x38 | 2 | 270 | 33.54 s |
+| 1000x1000 | 38x38 | 2 | 171 | 10.004 s |
+| 500x500 | 25x25 | 1 | 85 | 1.051 s |
+
+Iterations number grows slowly with the problem, meaning that the **coarse solver controls global low frequencies**.
+
+ ![Strong scaling](../dd-02-dd/performance-study/time_vs_dof.png)
+
+</br>
+
+### Overlap impact
+
+- Global grid size: 2500 $\times$ 2500
+- Coarse grid size: 120 $\times$ 120
+- Number of processors: 20
+
+| Overlap size | Number of iterations | Timing |
+| 1 | 311 | 126.46 s |
+| 2 | 270 | 33.54 s |
+| 5 | 233 | 103.594 s |
+| 10 | 192 | 88.526 s |
+
+Overlap size equal to 2 is clearly the optimal one: it provides a moderate number of iterations and minimal communication.
+
+![Strong scaling](../dd-02-dd/performance-study/overlap_study.png)
 
 </br>
 
@@ -266,11 +345,6 @@ At this point, it is possible to run the program in different modes:
     make run_args
     ```
     to keep **default parameters** (or overwrite them from command line), and obtain the parallel MPI solution.
-- Use   
-    ```
-    make run_seq
-    ```
-    to set input parameters **interactively** from terminal, and obtain the **sequential** solution.
 
 Each command writes the global solution into a `.csv` file to be visualized using the Python script [`visualization.py`](output/visualization.py).
 
