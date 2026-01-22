@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
   auto start = std::chrono::high_resolution_clock::now();
 
   // Execution
-  solver.run(max_it, tol, restart);
+  solver.run(max_it, tol, restart, hx, hy);
 
   // Stop timer
   MPI_Barrier(cart);  // Synchronize after solving
