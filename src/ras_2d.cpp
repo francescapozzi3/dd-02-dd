@@ -49,22 +49,25 @@ int Partition::find_best_coarse_grid(int Nf, int target_ratio)
     return best_Nc;
 }
 
+
 // ============================================================
 // COARSE SOLVER
 // ============================================================
 
-CoarseSolver::CoarseSolver(int Nx_, int Ny_, double Lx_, double Ly_, int Ncx_, int Ncy_, double mu_, double c_, int rank_)
+CoarseSolver::CoarseSolver(int Nx_, int Ny_, double Lx_, double Ly_, 
+                           int Ncx_, int Ncy_, double mu_, double c_, int rank_)
     : Nx(Nx_), Ny(Ny_), 
       Lx(Lx_), Ly(Ly_),
       Ncx(Ncx_), Ncy(Ncy_), 
       mu(mu_), c(c_),
       rank(rank_)
 {
-    // Every rank now stores and solves the coarse system 
+    // Every rank stores and solves the coarse system 
     int n_coarse = Ncx * Ncy;
 
+    // Global matrix representing the PDE on the coarse grid
     Ac.resize(n_coarse, n_coarse);
-    std::vector<Eigen::Triplet<double>> trips;  // Global matrix representing the PDE on the coarse grid
+    std::vector<Eigen::Triplet<double>> trips;  
     trips.reserve((std::size_t)n_coarse * 5);
 
     // Lambda function to add a triplet
@@ -131,7 +134,7 @@ void CoarseSolver::solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_loca
   for (int jc = 0; jc < Ncy; ++jc) {
     const int fine_gj = (int)std::lround(jc * ry);
 
-    // This coarse node not owned by my core -> skip
+    // Coarse node not owned by my core -> skip
     if (fine_gj < cj_s || fine_gj >= cj_s + core_ny) continue;
 
     for (int ic = 0; ic < Ncx; ++ic) {
@@ -189,9 +192,9 @@ void CoarseSolver::solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_loca
 
       e_local[idlocal(i, j, core_nx)] =
           (1.0 - dx) * (1.0 - dy) * ec_global[idlocal(i0, j0, Ncx)] +
-          dx          * (1.0 - dy) * ec_global[idlocal(i1, j0, Ncx)] +
-          (1.0 - dx) * dy          * ec_global[idlocal(i0, j1, Ncx)] +
-          dx         * dy          * ec_global[idlocal(i1, j1, Ncx)];
+          dx         * (1.0 - dy) * ec_global[idlocal(i1, j0, Ncx)] +
+          (1.0 - dx) * dy         * ec_global[idlocal(i0, j1, Ncx)] +
+          dx         * dy         * ec_global[idlocal(i1, j1, Ncx)];
     }
   }
 }
@@ -259,7 +262,7 @@ void LocalProblem::apply_RAS(const Eigen::VectorXd& r_core,
             // Global Dirichlet BCs: at boundaries, impose r=0
             if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) continue;
 
-            // If this node falls into the core, then copy r_core element; otherwise write 0.            
+            // If this node falls into the core, then copy r_core element; otherwise write 0            
             if (gi >= core_i0 && gi <= core_i1 && gj >= core_j0 && gj <= core_j1) {
                 int ii = gi - core_i0;
                 int jj = gj - core_j0;
@@ -271,29 +274,29 @@ void LocalProblem::apply_RAS(const Eigen::VectorXd& r_core,
         }
     }
   
-
   // Local solve: z_loc = A_loc^{-1} r_loc (sparse LU)
   Eigen::VectorXd z_loc = lu.solve(r_loc);
 
-    // Restriction RAS: take only values on core
-    for (int j = 0; j < core_ny; ++j){
-        for (int i = 0; i < core_nx; ++i) {
-            int gi = core_i0 + i;  // Global x index (core)
-            int gj = core_j0 + j;  // Global y index (core)
+  // Restriction RAS: take only values on core
+  for (int j = 0; j < core_ny; ++j){
+      for (int i = 0; i < core_nx; ++i) {
+          int gi = core_i0 + i;  // Global x index (core)
+          int gj = core_j0 + j;  // Global y index (core)
 
-            // Global Dirichlet BCs: skip update of boundary nodes
-            if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) continue;
+          // Global Dirichlet BCs: skip update of boundary nodes
+          if (gi == 0 || gi == Nx-1 || gj == 0 || gj == Ny-1) continue;
             
-            int ei = gi - ext_i0;  // Global x index (extended)
-            int ej = gj - ext_j0;  // Global y index (extended)
+          int ei = gi - ext_i0;  // Global x index (extended)
+          int ej = gj - ext_j0;  // Global y index (extended)
             
-            int eid = idlocal(ei, ej, ext_nx);
-            int cid = idlocal(i, j, core_nx);
+          int eid = idlocal(ei, ej, ext_nx);
+          int cid = idlocal(i, j, core_nx);
             
-            z_core[cid] = z_loc[eid];
-        }
+          z_core[cid] = z_loc[eid];
+      }
   }
 }
+
 
 void LocalProblem::assemble_and_factorize() {
   lu_ok = true;
@@ -483,10 +486,10 @@ void Solver::apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_l
     // 2. Level 2: Coarse Grid Correction (global)
     Eigen::VectorXd e_local_coarse = Eigen::VectorXd::Zero(core_n);
 
-    // r_local is just the local contribute to global residual.
+    // r_local is just the local contribute to global residual
     // Coarse solver constructs internally:
     //   r_global -> r_coarse -> solve -> e_coarse
-    // and then returns only local piece.
+    // and then returns only local piece
     coarse->solve(r_local, e_local_coarse, core_i0, core_j0, core_nx, core_ny, cart);
 
     // Add coarse correction to RAS result (with damping)
