@@ -528,6 +528,8 @@ void Solver::run(int max_it, double tol, int m_restart)
     std::cout << "  Max iterations: " << max_it << std::endl;
     std::cout << "  Tolerance: " << tol << std::endl;
   }
+
+  (void)m_restart;  // Suppress unused variable warning
   
   // Call BiCGSTAB
   stat = LinearAlgebra::BiCGSTAB(
