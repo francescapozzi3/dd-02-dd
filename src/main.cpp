@@ -79,6 +79,7 @@ int main(int argc, char** argv) {
     std::cout << "  Overlap:               " << overlap << " cells" << std::endl;
     std::cout << "  Diffusion coefficient: " << mu << std::endl;
     std::cout << "  Reaction coefficient:  " << c << std::endl;
+    std::cout << "  Coarse grid size:      " << Ncx << " x " << Ncy << std::endl;
     std::cout << "------------------------------------" << std::endl;
   }
 
