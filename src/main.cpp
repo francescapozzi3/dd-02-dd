@@ -108,12 +108,12 @@ int main(int argc, char** argv) {
   const double hx = Lx / (Nx - 1);
   const double hy = Ly / (Ny - 1);
 
-  if (size == 1 && overlap > 0) {
-    if (rank == 0) {
-      std::cout << "\nWARNING: Running with 1 processor." << std::endl;
-      std::cout << "           Setting overlap=0.\n" << std::endl;
-    }
-    overlap = 0;  // Force no overlap for sequential run
+  if (size == 1) {
+     if (rank == 0) {
+            std::cerr << "\nAlgorithm intrinsically parallel!" << std::endl;
+            std::cerr << "Cannot run with 1 processor" << std::endl;
+     }
+     MPI_Abort(MPI_COMM_WORLD, 1);
   }
 
   // Processes topology (MPI cartesian grid): divide processes into a Px*Py grid
