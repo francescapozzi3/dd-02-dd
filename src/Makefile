@@ -45,8 +45,6 @@ OVERLAP ?= 2
 MAX_IT  ?= 2000
 TOL     ?= 1e-06
 RESTART ?= 50
-NCX     ?= 9
-NCY     ?= 9
 
 # Default target
 all: directories $(TARGET)
@@ -67,12 +65,12 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 # Run with multiple processors
 run: $(TARGET)
 	@echo "Running with $(NPROCS) processors..."
-	@cd $(OUTPUT_DIR) && mpirun -np $(NPROCS) $(TARGET) $(NX) $(NY) $(LX) $(LY) $(MU) $(C) $(OVERLAP) $(MAX_IT) $(TOL) $(RESTART) $(NCX) $(NCY)
+	@cd $(OUTPUT_DIR) && mpirun -np $(NPROCS) $(TARGET) $(NX) $(NY) $(LX) $(LY) $(MU) $(C) $(OVERLAP) $(MAX_IT) $(TOL) $(RESTART)
 
 # Run sequentially (1 processor)
 run_seq: $(TARGET)
 	@echo "Running sequentially (1 processor)..."
-	@cd $(OUTPUT_DIR) && mpirun -np 1 $(TARGET) $(NX) $(NY) $(LX) $(LY) $(MU) $(C) $(OVERLAP) $(MAX_IT) $(TOL) $(RESTART) $(NCX) $(NCY)
+	@cd $(OUTPUT_DIR) && mpirun -np 1 $(TARGET) $(NX) $(NY) $(LX) $(LY) $(MU) $(C) $(OVERLAP) $(MAX_IT) $(TOL) $(RESTART) 
 
 # Clean build artifacts
 clean:
