@@ -31,6 +31,8 @@ public:
   //   -  len  : length of the block
    
   static void compute_1d_partition(int N, int nb, int proc_id, int& start, int& len);
+
+  static int find_best_coarse_grid(int Nf, int target_ratio);
 };
 
 
