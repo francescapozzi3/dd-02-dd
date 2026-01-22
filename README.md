@@ -289,7 +289,7 @@ Fixed number of processors: 20.
 
 Iterations number grows slowly with the problem, meaning that the **coarse solver controls global low frequencies**.
 
- ![Strong scaling](../dd-02-dd/performance-study/time_vs_dof.png)
+ ![Scaling with problem size](../dd-02-dd/performance-study/time_vs_dof.png)
 
 </br>
 
@@ -307,7 +307,7 @@ Iterations number grows slowly with the problem, meaning that the **coarse solve
 
 Overlap size equal to 2 is clearly the optimal one: it provides a moderate number of iterations and minimal communication.
 
-![Strong scaling](../dd-02-dd/performance-study/overlap_study.png)
+![Overlap impact](../dd-02-dd/performance-study/overlap_study.png)
 
 </br>
 
