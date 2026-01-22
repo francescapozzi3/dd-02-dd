@@ -88,8 +88,6 @@ int main(int argc, char** argv) {
         ask_param("Maximum number of iterations", max_it);
         ask_param("Tolerance", tol);
         ask_param("Restart for GMRES", restart);
-        ask_param("Number of coarse grid nodes along x", Ncx);
-        ask_param("Number of coarse grid nodes along y", Ncy);
     }
 
     // BROADCAST parameters to all ranks
@@ -103,8 +101,6 @@ int main(int argc, char** argv) {
     MPI_Bcast(&max_it,       1, MPI_INT,    0, MPI_COMM_WORLD);
     MPI_Bcast(&tol,          1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&restart,      1, MPI_INT,    0, MPI_COMM_WORLD);
-    MPI_Bcast(&Ncx,          1, MPI_INT,    0, MPI_COMM_WORLD);
-    MPI_Bcast(&Ncy,          1, MPI_INT,    0, MPI_COMM_WORLD);
   }
 
   if (size == 1 && overlap > 0) {
