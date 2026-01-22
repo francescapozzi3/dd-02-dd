@@ -557,7 +557,7 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local) {
             //   {core_i0, core_j0, core_nx, core_ny}
             int info[4];
             
-            MPI_Recv(info, 4, MPI_INT, p, 300, MPI_COMM_WORLD, &status);
+            MPI_Recv(info, 4, MPI_INT, p, 300, cart, &status);
             
             const int cs = info[0];  // Column start (core_i0 of process p)
             const int rs = info[1];  // Row start (core_j0 of process p)
@@ -566,7 +566,7 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local) {
 
             std::vector<double> buf(static_cast<std::size_t>(rn * cn));
             
-            MPI_Recv(buf.data(), rn*cn, MPI_DOUBLE, p, 301, MPI_COMM_WORLD, &status);
+            MPI_Recv(buf.data(), rn*cn, MPI_DOUBLE, p, 301, cart, &status);
 
             // Copy into global solution u
             for (int jj = 0; jj < rn; ++jj)
@@ -593,8 +593,8 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local) {
     } else {
         // Rank non-zero sends info + buffer to rank0
         int info[4] = { core_i0, core_j0, core_nx, core_ny };
-        MPI_Send(info, 4, MPI_INT, 0, 300, MPI_COMM_WORLD);
-        MPI_Send(x_local.data(), core_n, MPI_DOUBLE, 0, 301, MPI_COMM_WORLD);
+        MPI_Send(info, 4, MPI_INT, 0, 300, cart);
+        MPI_Send(x_local.data(), core_n, MPI_DOUBLE, 0, 301, cart);
     }
 }
 
