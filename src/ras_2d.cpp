@@ -20,6 +20,7 @@ void Partition::compute_1d_partition(int N, int nb, int proc_id, int& start, int
   len = base + (proc_id < rest ? 1 : 0);
 }
 
+
 int Partition::find_best_coarse_grid(int Nf, int target_ratio)
 {
     int fine_intervals = Nf - 1;
@@ -48,29 +49,31 @@ int Partition::find_best_coarse_grid(int Nf, int target_ratio)
     return best_Nc;
 }
 
-
 // ============================================================
 // COARSE SOLVER
 // ============================================================
 
-CoarseSolver::CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_)
+CoarseSolver::CoarseSolver(int Nx_, int Ny_, double Lx_, double Ly_, int Ncx_, int Ncy_, double mu_, double c_, int rank_)
     : Nx(Nx_), Ny(Ny_), 
+      Lx(Lx_), Ly(Ly_),
       Ncx(Ncx_), Ncy(Ncy_), 
       mu(mu_), c(c_),
       rank(rank_)
 {
     // Every rank now stores and solves the coarse system 
     int n_coarse = Ncx * Ncy;
+
     Ac.resize(n_coarse, n_coarse);
     std::vector<Eigen::Triplet<double>> trips;  // Global matrix representing the PDE on the coarse grid
+    trips.reserve((std::size_t)n_coarse * 5);
 
     // Lambda function to add a triplet
     auto add_trip = [&](int r, int cid, double val) {
        trips.emplace_back(static_cast<Eigen::Index>(r), static_cast<Eigen::Index>(cid), val);
     };
     
-    double hcx = 1.0 / (Ncx - 1);
-    double hcy = 1.0 / (Ncy - 1);
+    double hcx = Lx / (Ncx - 1);
+    double hcy = Ly / (Ncy - 1);
     double idx2 = 1.0 / (hcx * hcx);
     double idy2 = 1.0 / (hcy * hcy);
 
@@ -78,83 +81,120 @@ CoarseSolver::CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, dou
     for (int j = 0; j < Ncy; ++j) {
             for (int i = 0; i < Ncx; ++i) {
                 int row = idlocal(i, j, Ncx);   // 2D index to a 1D row index
+                
+                // Dirichlet boundary on coarse grid
                 if (i == 0 || i == Ncx-1 || j == 0 || j == Ncy-1) {
                     add_trip(row, row, 1.0);
-                    // Dirichlet boundary condition (fix the value at the boundary)
                     continue;
                 }
                 
                 // Diagonal Entry
-                add_trip(row, row, mu * (2 * idx2 + 2 * idy2) + c);
+                add_trip(row, row, mu * (2.0 * idx2 + 2.0 * idy2) + c);
 
-                if (i > 0)       add_trip(row, idlocal(i - 1, j, Ncx), -mu * idx2);
-                if (i < Ncx - 1) add_trip(row, idlocal(i + 1, j, Ncx), -mu * idx2);
-                if (j > 0)       add_trip(row, idlocal(i, j - 1, Ncx), -mu * idy2);
-                if (j < Ncy - 1) add_trip(row, idlocal(i, j + 1, Ncx), -mu * idy2);
+                add_trip(row, idlocal(i - 1, j, Ncx), -mu * idx2);
+                add_trip(row, idlocal(i + 1, j, Ncx), -mu * idx2);
+                add_trip(row, idlocal(i, j - 1, Ncx), -mu * idy2);
+                add_trip(row, idlocal(i, j + 1, Ncx), -mu * idy2);
             }
         }
-        Ac.setFromTriplets(trips.begin(), trips.end());
-        lu_coarse.compute(Ac); 
+
+    Ac.setFromTriplets(trips.begin(), trips.end());
+    Ac.makeCompressed();
+
+    lu_coarse.compute(Ac); 
+
+    if (lu_coarse.info() != Eigen::Success) {
+        if (rank == 0) {
+            std::cerr << "ERROR: Coarse grid LU factorization failed!" << std::endl;
+        }
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 }
+
 
 // Solve the coarse problem: Sparse Restriction -> Solve -> Prolongation
 void CoarseSolver::solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, 
-           int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use) 
+                         int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm cart) 
 {
-        int n_coarse = Ncx * Ncy;
-        // Each process creates a small local contribution vector
-        Eigen::VectorXd rc_local_contrib = Eigen::VectorXd::Zero(n_coarse);  
-        Eigen::VectorXd rc = Eigen::VectorXd::Zero(n_coarse);
-        
-        // Sparse Restriction: Injection 
-        // Each process only samples points that fall within its local core domain
-        double rx = (double)(Nx - 1) / (Ncx - 1);
-        double ry = (double)(Ny - 1) / (Ncy - 1);
+  const int n_coarse = Ncx * Ncy;
+  assert(r_local.size() == core_nx * core_ny);
 
-        for (int jc = 0; jc < Ncy; ++jc) {
-            int fine_gj = (int)round(jc * ry);    // Global fine Y index
-            if (fine_gj >= cj_s && fine_gj < cj_s + core_ny) {   
-                for (int ic = 0; ic < Ncx; ++ic) {
-                    int fine_gi = (int)round(ic * rx);   // Global fine X index
-                    if (fine_gi >= ci_s && fine_gi < ci_s + core_nx) {
-                        int local_idx = idlocal(fine_gi - ci_s, fine_gj - cj_s, core_nx);
-                        rc_local_contrib[idlocal(ic, jc, Ncx)] = r_local[local_idx];
-                    }
-                }
-            }
-        }
+  rc_local  = Eigen::VectorXd::Zero(n_coarse);
+  rc_global = Eigen::VectorXd::Zero(n_coarse);
 
-        // Communicate only the coarse grid data 
-        MPI_Allreduce(rc_local_contrib.data(), rc.data(), n_coarse, MPI_DOUBLE, MPI_SUM, comm_to_use);
+  // Fine-to-coarse mapping ratios in index space
+  const double rx = static_cast<double>(Nx - 1) / static_cast<double>(Ncx - 1);
+  const double ry = static_cast<double>(Ny - 1) / static_cast<double>(Ncy - 1);
 
-        // Solve the global system on the coarse grid
-        Eigen::VectorXd ec = lu_coarse.solve(rc);  
+  // RESTRICTION (geometric): Injection
+  // Sample fine residual at coarse nodes
+  for (int jc = 0; jc < Ncy; ++jc) {
+    const int fine_gj = (int)std::lround(jc * ry);
 
-        // Prolongation: Bi-linear Interpolation back to fine grid
-        // Every process calculates only its local piece of the global error correction
-        e_local = Eigen::VectorXd::Zero(core_nx * core_ny);
-        for (int j = 0; j < core_ny; ++j) {
-            for (int i = 0; i < core_nx; ++i) {
-                int gi = ci_s + i;
-                int gj = cj_s + j;
+    // This coarse node not owned by my core -> skip
+    if (fine_gj < cj_s || fine_gj >= cj_s + core_ny) continue;
 
-                double xc = gi / rx; 
-                double yc = gj / ry;
-                int i0 = (int)xc; 
-                int i1 = std::min(i0 + 1, Ncx - 1);
-                int j0 = (int)yc; 
-                int j1 = std::min(j0 + 1, Ncy - 1);
-                double dx = xc - i0; 
-                double dy = yc - j0;
-                
-                e_local[idlocal(i, j, core_nx)] =            // Bilinear interpolation
-                    (1 - dx) * (1 - dy) * ec[idlocal(i0, j0, Ncx)] +
-                    dx * (1 - dy) * ec[idlocal(i1, j0, Ncx)] +
-                    (1 - dx) * dy * ec[idlocal(i0, j1, Ncx)] +
-                    dx * dy * ec[idlocal(i1, j1, Ncx)];
-            }
-        }
+    for (int ic = 0; ic < Ncx; ++ic) {
+      const int fine_gi = (int)std::lround(ic * rx);
+
+      if (fine_gi < ci_s || fine_gi >= ci_s + core_nx) continue;
+
+      // Ignore global Dirichlet boundary nodes
+      if (fine_gi == 0 || fine_gi == Nx - 1 || fine_gj == 0 || fine_gj == Ny - 1) continue;
+
+      const int li = fine_gi - ci_s;
+      const int lj = fine_gj - cj_s;
+
+      const int local_idx = idlocal(li, lj, core_nx);
+      const int coarse_id = idlocal(ic, jc, Ncx);
+
+      rc_local[coarse_id] = r_local[local_idx];
     }
+  }
+
+  // Sum contributions across ranks 
+  MPI_Allreduce(rc_local.data(), rc_global.data(),
+                n_coarse, MPI_DOUBLE, MPI_SUM, cart);
+
+  // COARSE SOLVE: Ac * ec = rc
+  Eigen::VectorXd ec_global = lu_coarse.solve(rc_global);
+
+  // PROLONGATION: bilinear interpolation to local core
+  e_local = Eigen::VectorXd::Zero(core_nx * core_ny);
+
+  for (int j = 0; j < core_ny; ++j) {
+    const int gj = cj_s + j;
+    for (int i = 0; i < core_nx; ++i) {
+      const int gi = ci_s + i;
+
+      // Keep Dirichlet boundary correction = 0
+      if (gi == 0 || gi == Nx - 1 || gj == 0 || gj == Ny - 1) {
+        e_local[idlocal(i, j, core_nx)] = 0.0;
+        continue;
+      }
+
+      const double xc = static_cast<double>(gi) / rx;
+      const double yc = static_cast<double>(gj) / ry;
+
+      int i0 = (int)std::floor(xc);
+      int j0 = (int)std::floor(yc);
+      i0 = std::clamp(i0, 0, Ncx - 1);
+      j0 = std::clamp(j0, 0, Ncy - 1);
+
+      const int i1 = std::min(i0 + 1, Ncx - 1);
+      const int j1 = std::min(j0 + 1, Ncy - 1);
+
+      const double dx = xc - (double)i0;
+      const double dy = yc - (double)j0;
+
+      e_local[idlocal(i, j, core_nx)] =
+          (1.0 - dx) * (1.0 - dy) * ec_global[idlocal(i0, j0, Ncx)] +
+          dx          * (1.0 - dy) * ec_global[idlocal(i1, j0, Ncx)] +
+          (1.0 - dx) * dy          * ec_global[idlocal(i0, j1, Ncx)] +
+          dx         * dy          * ec_global[idlocal(i1, j1, Ncx)];
+    }
+  }
+}
 
 
 // ============================================================
@@ -437,17 +477,20 @@ void Solver::apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_l
         printed = true;
     }
     
-    // 1. Level 1: RAS Fine Correction  (fine level)
+    // 1. Level 1: RAS Fine Correction (local)
     local->apply_RAS(r_local, z_local);
 
-    // 2. Level 2: Coarse Grid Correction
+    // 2. Level 2: Coarse Grid Correction (global)
     Eigen::VectorXd e_local_coarse = Eigen::VectorXd::Zero(core_n);
+
+    // r_local is just the local contribute to global residual.
+    // Coarse solver constructs internally:
+    //   r_global -> r_coarse -> solve -> e_coarse
+    // and then returns only local piece.
     coarse->solve(r_local, e_local_coarse, core_i0, core_j0, core_nx, core_ny, cart);
 
-    // Add coarse correction to RAS result 
-    for (int i = 0; i < core_n; ++i) {
-            z_local[i] += e_local_coarse[i];
-    }
+    // Add coarse correction to RAS result (with damping)
+    z_local += 0.7 * e_local_coarse;
 }
 
 

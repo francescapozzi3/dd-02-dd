@@ -38,17 +38,28 @@ public:
 
 // CoarseSolver
 class CoarseSolver {
+
     int Nx, Ny;    // Fine grid dimensions
+
+    double Lx, Ly;
+
     int Ncx, Ncy;  // Coarse grid dimensions
+
     Eigen::SparseMatrix<double> Ac;
     Eigen::SparseLU<Eigen::SparseMatrix<double>> lu_coarse;
+
+    double mu, c;
     int rank;
-    double mu,c;
 
   public:
-    CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_);
+    CoarseSolver(int Nx_, int Ny_, double Lx_, double Ly_, int Ncx_, int Ncy_, double mu_, double c_, int rank_);
 
-    void solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use);
+    void solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm cart);
+  
+  private:
+
+    Eigen::VectorXd rc_local;
+    Eigen::VectorXd rc_global;
 };
 
 

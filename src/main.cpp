@@ -48,8 +48,6 @@ int main(int argc, char** argv) {
   // Physical domain [0, 1] x [0, 1]
   double Lx = 1.0;
   double Ly = 1.0;
-  const double hx = Lx / (Nx - 1);
-  const double hy = Ly / (Ny - 1);
 
   // PDE coefficients: -mu * Lapl(u) + c * u = f
   double mu = 1.0;  // Diffusion
@@ -63,7 +61,7 @@ int main(int argc, char** argv) {
 
   // Parsing arguments
   if (argc >= 3) { Nx      = std::stoi(argv[1]);   Ny = std::stoi(argv[2]); }
-  if (argc >= 5) { Lx      = std::stoi(argv[3]);   Ly = std::stoi(argv[4]); }
+  if (argc >= 5) { Lx      = std::stod(argv[3]);   Ly = std::stod(argv[4]); }
   if (argc >= 6)   mu      = std::stod(argv[5]);
   if (argc >= 7)   c       = std::stod(argv[6]);
   if (argc >= 8)   overlap = std::stoi(argv[7]);
@@ -93,8 +91,8 @@ int main(int argc, char** argv) {
     // BROADCAST parameters to all ranks
     MPI_Bcast(&Nx,           1, MPI_INT,    0, MPI_COMM_WORLD);
     MPI_Bcast(&Ny,           1, MPI_INT,    0, MPI_COMM_WORLD);
-    MPI_Bcast(&Lx,           1, MPI_INT,    0, MPI_COMM_WORLD);
-    MPI_Bcast(&Ly,           1, MPI_INT,    0, MPI_COMM_WORLD);
+    MPI_Bcast(&Lx,           1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&Ly,           1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&mu,           1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&c,            1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(&overlap,      1, MPI_INT,    0, MPI_COMM_WORLD);
@@ -103,6 +101,11 @@ int main(int argc, char** argv) {
     MPI_Bcast(&restart,      1, MPI_INT,    0, MPI_COMM_WORLD);
   }
 
+  if (mu <= 0 || c < 0) return -1;
+
+  const double hx = Lx / (Nx - 1);
+  const double hy = Ly / (Ny - 1);
+
   if (size == 1 && overlap > 0) {
     if (rank == 0) {
       std::cout << "\nWARNING: Running with 1 processor." << std::endl;
@@ -110,10 +113,6 @@ int main(int argc, char** argv) {
     }
     overlap = 0;  // Force no overlap for sequential run
   }
-
-  // Coarse grid
-  int Ncx = Partition::find_best_coarse_grid(Nx, 20); 
-  int Ncy = Partition::find_best_coarse_grid(Ny, 20);
 
   // Processes topology (MPI cartesian grid): divide processes into a Px*Py grid
   int dims[2] = {0, 0};     // 0 allows MPI to choose best subdivision
@@ -138,6 +137,21 @@ int main(int argc, char** argv) {
   MPI_Cart_shift(cart, 0, 1, &left, &right);
   MPI_Cart_shift(cart, 1, 1, &down, &up);
 
+
+  // DOMAIN DECOMPOSITION: compute core region
+  int core_i0, core_nx;  // Start index and length along x
+  int core_j0, core_ny;  // Start index and length along y
+
+  // Partition x axis based on process coord in the grid (coords[0])
+  Partition::compute_1d_partition(Nx, dims[0], coords[0], core_i0, core_nx);
+
+  // Partition y axis based on process coord in the grid (coords[1])
+  Partition::compute_1d_partition(Ny, dims[1], coords[1], core_j0, core_ny);
+
+  // Coarse grid
+  int Ncx = Partition::find_best_coarse_grid(Nx, 20); 
+  int Ncy = Partition::find_best_coarse_grid(Ny, 20);
+
   // Print solver configuration
   if (cart_rank == 0) {
     std::cout << "======== PARALLEL RAS SOLVER 2D =======" << std::endl;
@@ -151,17 +165,6 @@ int main(int argc, char** argv) {
     std::cout << "------------------------------------" << std::endl;
   }
 
-
-  // DOMAIN DECOMPOSITION: compute core region
-  int core_i0, core_nx;  // Start index and length along x
-  int core_j0, core_ny;  // Start index and length along y
-
-  // Partition x axis based on process coord in the grid (coords[0])
-  Partition::compute_1d_partition(Nx, dims[0], coords[0], core_i0, core_nx);
-
-  // Partition y axis based on process coord in the grid (coords[1])
-  Partition::compute_1d_partition(Ny, dims[1], coords[1], core_j0, core_ny);
-
   // Create local problem
   LocalProblem* local = new LocalProblem(core_i0, core_j0, core_nx, core_ny, 
                                          overlap, Nx, Ny, hx, hy, mu, c);
@@ -173,7 +176,7 @@ int main(int argc, char** argv) {
   }
 
   // Create CoarseSolver object
-  CoarseSolver *coarse = new CoarseSolver(Nx, Ny, Ncx, Ncy, mu, c, rank);
+  CoarseSolver *coarse = new CoarseSolver(Nx, Ny, Lx, Ly, Ncx, Ncy, mu, c, cart_rank);
 
   // Create solver
   Solver solver(cart, cart_rank, size,
