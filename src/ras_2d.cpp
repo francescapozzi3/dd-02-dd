@@ -609,7 +609,7 @@ void Solver::matvec(const Eigen::VectorXd& p,
 }
 
 
-void Solver::gather_and_save(const Eigen::VectorXd& x_local)
+void Solver::gather_and_save(const Eigen::VectorXd& x_local, const double hx, const double hy)
 {
   // Rank 0 gathers info + buffer from all ranks and writes solution.csv
   if (rank == 0) {
@@ -658,8 +658,8 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local)
     ofs << "x,y,u\n";
     for (int j = 0; j < Ny; ++j) {
       for (int i = 0; i < Nx; ++i) {
-        const double xg = i * (1.0 / (Nx - 1));
-        const double yg = j * (1.0 / (Ny - 1));
+        const double xg = i * hx;
+        const double yg = j * hy;
         ofs << xg << "," << yg << "," << u[idlocal(i, j, Nx)] << "\n";
       }
     }
@@ -677,7 +677,7 @@ void Solver::gather_and_save(const Eigen::VectorXd& x_local)
 }
 
 
-void Solver::run(int max_it, double tol, int m_restart)
+void Solver::run(int max_it, double tol, int m_restart, const double hx, const double hy)
 {
   // Initial guess
   Eigen::VectorXd u = Eigen::VectorXd::Zero(core_n);
@@ -761,7 +761,7 @@ void Solver::run(int max_it, double tol, int m_restart)
   
 
   // Gather and save solution
-  gather_and_save(u);
+  gather_and_save(u, hx, hy);
 
 }
 
