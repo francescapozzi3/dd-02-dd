@@ -329,7 +329,7 @@ public:
   Eigen::VectorXd solve(const Eigen::VectorXd& r) const
   {
     Eigen::VectorXd z(r.size());
-    solver->apply_RAS(r, z);
+    solver->apply_TwoLevel(r, z);
     return z;
   }
 };
@@ -400,6 +400,12 @@ void Solver::apply_RAS(const Eigen::VectorXd& r,Eigen::VectorXd& z) const
 
 void Solver::apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_local)
 {
+    static bool printed = false; 
+    if (!printed && rank == 0) {
+        std::cout << "\nPreconditioner: Two-Level (RAS + Coarse Grid)" << std::endl;
+        printed = true;
+    }
+    
     // 1. Level 1: RAS Fine Correction  (fine level)
     local->apply_RAS(r_local, z_local);
 
