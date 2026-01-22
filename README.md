@@ -7,7 +7,7 @@ Politecnico di Milano, January 2026
 | Francesca Marina Pozzi | 10837189 |
 | Martina Rusconi | 10857811 |
 
-</br>
+<br>
 
 # Restricted Additive Schwarz preconditioner with coarse correction on a 2D domain
 
@@ -28,9 +28,9 @@ where:
 - $c\geq0$ is the reaction coefficient
 - $f=1$ is the forcing term
 - $\Delta$ is the Laplacian operator
-- The boundary conditions are of *homogeneous* Dirichlet type
+- the boundary conditions are of *homogeneous* Dirichlet type
 
-</br>
+<br>
 
 ## Discretization
 
@@ -54,7 +54,7 @@ Au&=\frac{\mu}{h_x^2}\bigg[ -u(i-1,j)+2u(i,j)-u(i+1,j) \bigg]+ \\
 \end{aligned}
 $$
 
-</br>
+<br>
 
 ## Code structure
 
@@ -66,25 +66,25 @@ Our strategy has been developed focusing on the following aspects:
 2. **Overlapping subdomains**  
     Each process solves a local subproblem defined on a region which is overlapping with the ones of neighbors (Restricted Additive Schwarz method).
 3. **Two-level preconditioning**  
-    The local preconditioning technique (RAS) is combined with a coarse correction to make the alorithm scalable.
+    The local preconditioning technique (RAS) is combined with a coarse correction to make the algorithm scalable.
 4. **Krylov solver**  
     BiCGSTAB iterative method is used to solve the global system.
 
-</br>
+<br>
 
 ### Implementation decisions
 
 RAS method requires to define an **overlap region** to improve convergence. For this reason, a "core" region is *uniquely* assigned to each process, but the solution of the local problem occurs on an "extended" region (core $+$ overlap). 
 
-The information exchange exploits ghost cells to preform matrix-vector product (1-layer overlap) and customizable overlap size for the RAS method itself.
+The information exchange exploits ghost cells to perform parallel matrix-vector product (1-layer overlap) and customizable overlap size for the RAS method itself.
 
-</br>
+<br>
 
 Moreover, to make MPI communication more performing, we chose to use `MPI_Sendrecv` to implement **simultaneous bidirectional exchanges** between neighboring processes. Indeed, this avoids deadlocks and reduces latency.
 
 Processes on global boundaries communicate with `MPI_PROC_NULL`.
 
-</br>
+<br>
 
 Increasing the number of processes produces a higher degree of parallelism, which is useful when the problem sizes are close to the real world ones. However, RAS alone *does not* provide scalability: convergence rate degrades as the number of workers grows.
 
@@ -92,13 +92,13 @@ The **coarse correction** is then used to provide global coupling and implicit c
 
 The coarse grid size is chosen automatically, looking for a **trade-off** between computational costs and preconditioning effectiveness.
 
-</br>
+<br>
 
 Lastly, the final choice of the iterative solver for the global problem fell on **BiCGSTAB**. Indeed, it is a method suited for unsymmetric linear systems (but behaves as Conjugate Gradient with symmetric ones) that provides fast convergence.
 
 Also GMRES is available in the code but commented: it guarantees convergence but is preferable to be used for badly conditioned problems.
 
-</br>
+<br>
 
 ### Memory usage
 
@@ -106,7 +106,7 @@ The system matrix is stored in a **CSR sparse format** in such a way that only t
 
 Data have a row-major ordering to be consistent with Eigen, but also to enhance **coalescent and cache-friendly accesses**.
 
-</br>
+<br>
 
 ### Configuration parameters
 
@@ -133,54 +133,54 @@ h_x=\frac{L_x}{N_x-1},\quad h_y=\frac{L_y}{N_y-1}
 \end{aligned}
 $$
 
-</br>
+<br>
 
 ### Classes
 
 - `Partition`  
     It handles the domain partitioning between MPI processes.
 
-    </br>
+    <br>
 
     | Key methods | Roles |
     | :---------: | :---- |
     | `compute_1d_partition(int N, int nb, int proc_id, int& start, int& len)`| Divides `N` nodes into `nb` blocks as evenly as possible, and returns the starting index (`start`) and subdomain length (`len`) for the process `proc_id`. |
     | `find_best_coarse_grid(int Nf, int target_ratio)` | Determines the optimal coarse grid size by looking for factors of `Nf - 1` that are the closest to the `target_ratio` (in this case we would like the fine grid spacings to be about $1/20$ of the coarse ones). |
 
-</br>
+<br>
 
 - `CoarseSolver`  
     It implements the coarse correction for the two-level preconditioner.
 
-    </br>
+    <br>
 
     | Key methods | Roles |
     | :---------: | :---- |
     | `CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_)` | Assembles the matrix `Ac` defined on the coarser grid, applies on it the same differential operator as the one for the fine grid, and executes the sparse LU factorization. |
     | `solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use)` | Injects from the fine residual to the coarse one, solves `Ac*ec = rc` using LU factorization to eliminate low frequency error components, and then uses bilinear interpolation to prolongate the correction to the fine grid. |
 
-</br>
+<br>
 
 - `LocalProblem`  
     It handles the local subproblem with overlap.
 
-    </br>
+    <br>
 
     | Key methods | Roles |
     | :---------: | :---- |
     | `assemble_and_factorize()` | Assembles the local matrix `A_loc` on the extended region, applies global Dirichlet boundary conditions, and executes sparse LU factorization. |
     | `apply_RAS(const Eigen::VectorXd& r_core, Eigen::VectorXd& z_core)` | Extends `r_core` with zeros in overlap positions, computes the local solution `z_loc = A_loc^(-1) * r_loc`, and then extracts only core values from `z_loc`. |
 
-    </br> 
+    <br> 
 
     This implements RAS method. Indeed, each process solves locally with overlap but returns the correction defined only on its core region.
 
-</br>
+<br>
 
 - `Solver`  
     The main class, it coordinates the parallel solution of the linear system.
 
-    </br> 
+    <br> 
 
     | Key methods | Roles |
     | :---------: | :---- |
@@ -191,7 +191,7 @@ $$
     | `run(int max_it, double tol, int m_restart, const double hx, const double hy)` | Calls preconditioned BiCGSTAB (or GMRES), and then gathers and saves the global solution. |
     | `gather_and_save(const Eigen::VectorXd& x_local, const double hx, const double hy)` | Aggregates the distributed solution and saves it to a `.csv` file. |
 
-</br>
+<br>
 
 ### Entry point
 
@@ -199,23 +199,23 @@ $$
 - Taking arguments from command line
 - Using interactive input interface, implemented through the utility function `ask_param`.
 
-</br>
+<br>
 
 MPI processes are distributed into a logic **2D cartesian grid**:
 1. `MPI_Dims_create` to decide how to divide processes
 2. `MPI_Cart_create` to create a cartesian communicator
 3. `MPI_Cart_shift` to identify neighbors to exchange overlap values with
 
-</br>
+<br>
 
 The global `Nx`$\times$`Ny` grid is subdivided into local subdomains: each process becomes responsible for a specific core region.
 
-</br>
+<br>
 
 After creating `LocalProblem` and `Solver`, the latter one is run using `solver.run()`. The execution time is measured using `std::chrono`, ensuring that all processes are synchronized at the beginning and at the and of the computation phase.
 
 
-</br>
+<br>
 
 ### External dependencies
 
@@ -223,18 +223,20 @@ After creating `LocalProblem` and `Solver`, the latter one is run using `solver.
 - **Eigen3** for linar algebra
 - **Custom libraries** such as `gmres.hpp` and `bicgstab.hpp` for iterative solvers
 
-</br>
+<br>
 
 ## Performance and scaling
 
 <u>Note</u>: this implementation is intrinsically parallel.
 
-Some parameters were fixed to guarantee a simpler analysis:
+Some parameters are fixed to guarantee a simpler analysis:
 - Domain $\Omega=[0,1]^2$
 - Diffusion coefficient $\mu=1.0$
 - Reaction coefficient $c=0.1$
 - Maximum number of iterations is 5000
-- Tolerance is 1e-06
+- Tolerance is up to 1e-06
+
+<br>
 
 In this section we will use the following formulas:
 
@@ -253,7 +255,7 @@ where:
 - $S(p)$ is the speedup with $p$ processors (with respect to the 2 processors case)
 - $E(p)$ is the efficiency with $p$ processors
 
-</br>
+<br>
 
 ### Strong scaling 
 
@@ -273,9 +275,9 @@ where:
 
 The algorithm provides a **realistic strong scaling**, proving that MPI communication costs are overriden by factorization costs when computations are performed by less processes.
 
-![Strong scaling](performance-study/strong.png)
+![Strong scaling](figures/performance-study/strong.png)
 
-</br>
+<br>
 
 ### Scaling with problem size
 
@@ -293,9 +295,9 @@ Fixed number of processors: 20.
 
 Iterations number grows slowly with the problem, meaning that the **coarse solver controls global low frequencies**.
 
- ![Scaling with problem size](performance-study/time_vs_dof.png)
+![Scaling with problem size](figures/performance-study/vs_dof.png)
 
-</br>
+<br>
 
 ### Overlap impact
 
@@ -314,9 +316,9 @@ Iterations number grows slowly with the problem, meaning that the **coarse solve
 
 Overlap size equal to 2 is clearly the optimal one: it provides a moderate number of iterations and minimal communication.
 
-![Overlap impact](performance-study/overlap_study.png)
+![Overlap impact](figures/performance-study/overlap_study.png)
 
-</br>
+<br>
 
 ## Code usage
 
@@ -326,7 +328,7 @@ It is possible to clone this repository using
 git clone https://github.com/francescapozzi3/dd-02-dd
 ```
 
-</br>
+<br>
 
 Then go to `\src` directory 
 ```
@@ -339,7 +341,7 @@ make
 
 This action will compile the code contained into `\src` including the header files into `\include`. New folders will be automatically created: `\build` to contain the object files and the target `ras_2d_mpi`, and `\output` to hold the `.csv` file.
 
-</br>
+<br>
 
 At this point, it is possible to run the program in different modes:
 - Use   
@@ -355,7 +357,7 @@ At this point, it is possible to run the program in different modes:
 
 Each command writes the global solution into a `.csv` file to be visualized using the Colab script [`visualization.ipynb`](output/visualization.ipynb).
 
-</br>
+<br>
 
 ## Visualization
 
@@ -364,6 +366,25 @@ Open the file [`visualization.ipynb`](output/visualization.ipynb) and click on G
 Since Colab provides only 2 processors, choose a proper grid size and the input parameters for the PDE you want to solve. 
 
 Running the code will output various graphs comparing the numerical solution to the exact solution.
+
+<br>
+
+For example, using the following parameters:
+- Global grid size: 150 $\times$ 150
+- Coarse grid size: 8 $\times$ 8
+- Domain: $[0,2]^2$
+- Diffusion coefficient $\mu$: 1
+- Reaction coefficient $c$: 0.1
+- Overlap size: 2
+- Maximum number of iterations: 1000
+- Tolerance: 1e-06
+
+We obtain graphs confirming that the implemented method has reached convergence.
+
+![Compare solutions](figures/example/compare_sol.png)
+
+![Central cut](figures/example/central_cut.png)
+
 
 
 
