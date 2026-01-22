@@ -16,7 +16,7 @@ This project aims to numerically solve the following **2D diffusion-reaction pro
 $$
 \begin{aligned}
 \begin{cases}
--\mu\,\Delta u(x,y) + cu(x,y) = 1 &(x,y)\in\Omega \\
+-\mu\Delta u(x,y) + cu(x,y) = 1 &(x,y)\in\Omega \\
 u(x,y)=0 &(x,y)\in\partial\Omega
 \end{cases}
 \end{aligned}
