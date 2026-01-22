@@ -18,9 +18,6 @@ int main(int argc, char** argv) {
   // Global grid
   int Nx = 100, Ny = 100;
 
-  // Coarse grid
-  int Ncx = 9, Ncy = 9;
-
   // Physical domain [0, 1] x [0, 1]
   double Lx = 1.0;
   double Ly = 1.0;
@@ -46,7 +43,10 @@ int main(int argc, char** argv) {
   if (argc >= 9)   max_it  = std::stoi(argv[8]);
   if (argc >= 10)  tol     = std::stod(argv[9]);
   if (argc >= 11)  restart = std::stoi(argv[10]);
-  if (argc >= 13) { Ncx    = std::stoi(argv[11]); Ncy = std::stoi(argv[12]); }
+
+  // Coarse grid
+  int Ncx = Partition::find_best_coarse_grid(Nx, 20); 
+  int Ncy = Partition::find_best_coarse_grid(Ny, 20);
 
   // Processes topology (MPI cartesian grid): divide processes into a Px*Py grid
   int dims[2] = {0, 0};     // 0 allows MPI to choose best subdivision
