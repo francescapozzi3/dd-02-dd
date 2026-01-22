@@ -109,11 +109,12 @@ private:
   // Geometry: extended box subdomain (inclusive)
   int ext_i0, ext_i1, ext_j0, ext_j1;
   int ext_nx, ext_ny, ext_n;
-  int overlap;
 
   // Geometry: core box subdomain (inclusive)
   int core_i0, core_i1, core_j0, core_j1;
   int core_nx, core_ny, core_n;
+
+  int overlap;
 
   // Global sized
   int Nx, Ny;

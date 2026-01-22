@@ -74,6 +74,7 @@ BiCGSTAB(const Matrix &A, Vector &x, const Vector &b, const Preconditioner &M,
         {
           x += alpha * phat;
           tol = resid;
+          max_iter = i;
           return 0;
         }
       shat = M.solve(s);
