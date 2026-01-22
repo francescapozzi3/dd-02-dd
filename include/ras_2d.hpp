@@ -31,11 +31,28 @@ public:
   //   -  len  : length of the block
    
   static void compute_1d_partition(int N, int nb, int proc_id, int& start, int& len);
+
+  static int find_best_coarse_grid(int Nf, int target_ratio);
+};
+
+
+// CoarseSolver
+class CoarseSolver {
+    int Nx, Ny;    // Fine grid dimensions
+    int Ncx, Ncy;  // Coarse grid dimensions
+    Eigen::SparseMatrix<double> Ac;
+    Eigen::SparseLU<Eigen::SparseMatrix<double>> lu_coarse;
+    int rank;
+    double mu,c;
+
+  public:
+    CoarseSolver(int Nx_, int Ny_, int Ncx_, int Ncy_, double mu_, double c_, int rank_);
+
+    void solve(const Eigen::VectorXd& r_local, Eigen::VectorXd& e_local, int ci_s, int cj_s, int core_nx, int core_ny, MPI_Comm comm_to_use);
 };
 
 
 // Assemble and solve local problems on extended subdomains
-
 class LocalProblem {
 public:
 
@@ -127,7 +144,8 @@ public:
                 int cj_s_, int core_ny_,
                 double hx_, double hy_, double mu_, double c_,
                 int left_, int right_, int down_, int up_,
-                LocalProblem* localProb);
+                LocalProblem* localProb,
+                CoarseSolver *coarseProb );
 
   // Ownership of LocalProblem is not transferred
   ~Solver() = default;
@@ -155,12 +173,14 @@ private:
   void matvec(const Eigen::VectorXd& p,
               Eigen::VectorXd& Ap);
 
-  // Apply the preconditioner (delegated to LocalProblem).
-  void apply_RAS(const Eigen::VectorXd& r,
-                Eigen::VectorXd& z) const;
+  // Apply the preconditioner (delegated to LocalProblem)
+  void apply_RAS(const Eigen::VectorXd& r, Eigen::VectorXd& z) const;
 
-  // Gather final solution: rank 0 receives (info + buffer) and writes solution.csv.
+  // Gather final solution: rank 0 receives (info + buffer) and writes solution.csv
   void gather_and_save(const Eigen::VectorXd& x_local);
+
+  // Two-Level preconditioner
+  void apply_TwoLevel(const Eigen::VectorXd& r_local, Eigen::VectorXd& z_local);
 
 private:
   MPI_Comm cart;
@@ -177,6 +197,7 @@ private:
 
   // Non-owning
   LocalProblem* local;
+  CoarseSolver* coarse;
 
   // Halo storage (core + ghost layer 1 cell)
   int halo_nx, halo_ny;

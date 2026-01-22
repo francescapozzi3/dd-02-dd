@@ -45,9 +45,6 @@ int main(int argc, char** argv) {
   // Global grid
   int Nx = 100, Ny = 100;
 
-  // Coarse grid
-  int Ncx = 9, Ncy = 9;
-
   // Physical domain [0, 1] x [0, 1]
   double Lx = 1.0;
   double Ly = 1.0;
@@ -118,6 +115,10 @@ int main(int argc, char** argv) {
     overlap = 0;  // Force no overlap for sequential run
   }
 
+  // Coarse grid
+  int Ncx = Partition::find_best_coarse_grid(Nx, 20); 
+  int Ncy = Partition::find_best_coarse_grid(Ny, 20);
+
   // Processes topology (MPI cartesian grid): divide processes into a Px*Py grid
   int dims[2] = {0, 0};     // 0 allows MPI to choose best subdivision
   MPI_Dims_create(size, 2, dims);
@@ -150,6 +151,7 @@ int main(int argc, char** argv) {
     std::cout << "  Overlap:               " << overlap << " cells" << std::endl;
     std::cout << "  Diffusion coefficient: " << mu << std::endl;
     std::cout << "  Reaction coefficient:  " << c << std::endl;
+    std::cout << "  Coarse grid size:      " << Ncx << " x " << Ncy << std::endl;
     std::cout << "------------------------------------" << std::endl;
   }
 
