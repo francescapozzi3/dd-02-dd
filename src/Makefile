@@ -8,8 +8,6 @@
 #
 # RUN WITH DEFAULT ARGUMENTS: make run_args
 #
-# RUN SEQUENTIALLY: make run_seq
-#
 # CLEAN: 
 #  Remove only .o and executable: make clean
 #  Remove build/ and output/:     make distclean
@@ -76,11 +74,6 @@ run: $(TARGET)
 run_args: $(TARGET)
 	@echo "Running with $(NPROCS) processors..."
 	@cd $(OUTPUT_DIR) && mpirun -np $(NPROCS) $(TARGET) $(ARGS)
-
-# Run sequentially (1 processor)
-run_seq: $(TARGET)
-	@echo "Running sequentially (1 processor)..."
-	@cd $(OUTPUT_DIR) && mpirun -np 1 $(TARGET) 
 
 # Clean build artifacts
 clean:
