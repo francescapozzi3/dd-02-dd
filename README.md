@@ -14,7 +14,12 @@ Politecnico di Milano, January 2026
 This project aims to numerically solve the following **2D diffusion-reaction problem** 
 
 $$
-\begin{aligned} \begin{cases} -\mu\,\Delta u(x,y) + cu(x,y) = 1 &(x,y)\in\Omega \\ u(x,y)=0 &(x,y)\in\partial\Omega\end{cases} \end{aligned}
+\begin{aligned}
+\begin{cases}
+-\mu\,\Delta u(x,y) + cu(x,y) = 1 &(x,y)\in\Omega \\
+u(x,y)=0 &(x,y)\in\partial\Omega
+\end{cases}
+\end{aligned}
 $$
 
 where:
@@ -42,7 +47,11 @@ u(i-1,j)--u(i,j)--u(i+1,j)
 The resulting discrete operator is given by: 
 
 $$
-\begin{aligned} Au&=\frac{\mu}{h_x^2}\bigg[ -u(i-1,j)+2u(i,j)-u(i+1,j) \bigg]+ \\ &+\frac{\mu}{h_y^2}\bigg[ -u(i,j-1)+2u(i,j)-u(i,j+1) \bigg] + \\ &+cu(i,j) \end{aligned}
+\begin{aligned}
+Au&=\frac{\mu}{h_x^2}\bigg[ -u(i-1,j)+2u(i,j)-u(i+1,j) \bigg]+ \\
+&+\frac{\mu}{h_y^2}\bigg[ -u(i,j-1)+2u(i,j)-u(i,j+1) \bigg] +
+\\ &+cu(i,j)
+\end{aligned}
 $$
 
 </br>
@@ -119,7 +128,9 @@ The program accepts the following parameters:
 Grid sizes along $x$ and $y$ are computed as follows:
 
 $$
-\begin{aligned} h_x=\frac{L_x}{N_x-1}\;,\quad h_y=\frac{L_y}{N_y-1}\end{aligned}
+\begin{aligned}
+h_x=\frac{L_x}{N_x-1},\quad h_y=\frac{L_y}{N_y-1}
+\end{aligned}
 $$
 
 </br>
